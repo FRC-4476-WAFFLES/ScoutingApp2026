@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
     View,
     Text,
@@ -12,37 +12,32 @@ import {
     StatusBar,
     Modal,
     TouchableWithoutFeedback,
-    Keyboard
+    Keyboard,
+    Dimensions,
+    Animated
 } from "react-native";
 
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Clipboard from 'expo-clipboard';
-import Checkbox from 'expo-checkbox';
 import { MaterialIcons } from '@expo/vector-icons';
+import { colors } from "../components/colors";
 
 const getAllianceColor = (driverStation) => {
   if (!driverStation) return null;
-  return driverStation.charAt(0) === 'R' ? 'rgba(255, 0, 0, 0.1)' : 'rgba(0, 0, 255, 0.1)';
+  return driverStation.charAt(0) === 'R' ? colors.redAlliance : colors.blueAlliance;
+};
+
+const getAllianceTextColor = (driverStation) => {
+  if (!driverStation) return colors.textPrimary;
+  return driverStation.charAt(0) === 'R' ? colors.redAllianceText : colors.blueAllianceText;
 };
 
 const MatchScreen = props => {
   const { navigation, route } = props;
 
-  // Auto state variables
-  const [autoL1Coral, setAutoL1Coral] = useState(0);
-  const [autoL2Coral, setAutoL2Coral] = useState(0);
-  const [autoL3Coral, setAutoL3Coral] = useState(0);
-  const [autoL4Coral, setAutoL4Coral] = useState(0);
-  const [autoAlgaeProcessor, setAutoAlgaeProcessor] = useState(0);
-  const [autoAlgaeNet, setAutoAlgaeNet] = useState(0);
-
-  // TeleOp state variables
-  const [teleOpL1Coral, setTeleOpL1Coral] = useState(0);
-  const [teleOpL2Coral, setTeleOpL2Coral] = useState(0);
-  const [teleOpL3Coral, setTeleOpL3Coral] = useState(0);
-  const [teleOpL4Coral, setTeleOpL4Coral] = useState(0);
-  const [teleOpAlgaeProcessor, setTeleOpAlgaeProcessor] = useState(0);
-  const [teleOpAlgaeNet, setTeleOpAlgaeNet] = useState(0);
+  // Simplified state - just fuel scored
+  const [autoFuelScored, setAutoFuelScored] = useState(0);
+  const [teleOpFuelScored, setTeleOpFuelScored] = useState(0);
 
   const [isCommentModalVisible, setIsCommentModalVisible] = useState(false);
   const [commentValue, setCommentValue] = useState('');
@@ -50,20 +45,41 @@ const MatchScreen = props => {
   const [isQuestionModalVisible, setIsQuestionModalVisible] = useState(false);
   const [questionValue, setQuestionValue] = useState('');
 
-  const [isAutoExpanded, setIsAutoExpanded] = useState(true);
-  const [isTeleOpExpanded, setIsTeleOpExpanded] = useState(true);
-
   const [driverStation, setDriverStation] = useState(null);
+  const [isTablet, setIsTablet] = useState(false);
 
-  const [removedAlgae, setRemovedAlgae] = useState(false);
+  // Recent change tracking
+  const [recentAutoChange, setRecentAutoChange] = useState(null);
+  const [recentTeleOpChange, setRecentTeleOpChange] = useState(null);
+  const autoTimeoutRef = useRef(null);
+  const teleOpTimeoutRef = useRef(null);
+  const autoTimerAnim = useRef(new Animated.Value(0)).current;
+  const teleOpTimerAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const updateLayout = () => {
+      const dim = Dimensions.get('screen');
+      setIsTablet(Math.min(dim.width, dim.height) >= 600);
+    };
+    updateLayout();
+    const subscription = Dimensions.addEventListener('change', updateLayout);
+    return () => subscription.remove();
+  }, []);
+
+  // Clear timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (autoTimeoutRef.current) clearTimeout(autoTimeoutRef.current);
+      if (teleOpTimeoutRef.current) clearTimeout(teleOpTimeoutRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const loadExistingMatchData = async () => {
       if (route.params?.matchNum) {
         const csvURI = `${FileSystem.documentDirectory}match${route.params.matchNum}.csv`;
-        
+
         try {
-          // First check if file exists
           const fileInfo = await FileSystem.getInfoAsync(csvURI);
           if (!fileInfo.exists) {
             console.log("No existing data file found for match", route.params.matchNum);
@@ -72,61 +88,30 @@ const MatchScreen = props => {
 
           const data = await FileSystem.readAsStringAsync(csvURI);
           console.log("Raw data loaded:", data);
-          
-          // Split the CSV properly handling quoted values
+
           const values = data.split(',').map(val => val.replace(/^"|"$/g, ''));
           console.log("Split values:", values);
-          
-          // Only proceed if we have the minimum required values (team info + scoring)
-          if (values.length >= 19) {
-            // Auto values (indices 7-12)
-            const autoValues = values.slice(7, 13).map(v => parseInt(v));
-            console.log("Auto values:", autoValues);
-            
-            if (!autoValues.some(isNaN)) {
-              setAutoL1Coral(autoValues[0]);
-              setAutoL2Coral(autoValues[1]);
-              setAutoL3Coral(autoValues[2]);
-              setAutoL4Coral(autoValues[3]);
-              setAutoAlgaeProcessor(autoValues[4]);
-              setAutoAlgaeNet(autoValues[5]);
+
+          // Load fuel scores (indices 7 and 8)
+          if (values.length >= 9) {
+            const auto = parseInt(values[7]);
+            const teleOp = parseInt(values[8]);
+
+            if (!isNaN(auto)) setAutoFuelScored(auto);
+            if (!isNaN(teleOp)) setTeleOpFuelScored(teleOp);
+
+            // Comments & Questions (indices 9-10)
+            if (values.length > 9) {
+              setCommentValue(values[9] || '');
+            }
+            if (values.length > 10) {
+              setQuestionValue(values[10] || '');
             }
 
-            // TeleOp values (indices 13-18)
-            const teleOpValues = values.slice(13, 19).map(v => parseInt(v));
-            console.log("TeleOp values:", teleOpValues);
-            
-            if (!teleOpValues.some(isNaN)) {
-              setTeleOpL1Coral(teleOpValues[0]);
-              setTeleOpL2Coral(teleOpValues[1]);
-              setTeleOpL3Coral(teleOpValues[2]);
-              setTeleOpL4Coral(teleOpValues[3]);
-              setTeleOpAlgaeProcessor(teleOpValues[4]);
-              setTeleOpAlgaeNet(teleOpValues[5]);
-            }
-
-            // Removed Algae (index 19)
-            if (values.length > 19) {
-              setRemovedAlgae(values[19] === '1');
-            }
-
-            // Comments & Questions (indices 20-21)
-            if (values.length > 20) {
-              setCommentValue(values[20] || '');
-            }
-            if (values.length > 21) {
-              setQuestionValue(values[21] || '');
-            }
-            console.log("Comment value:", commentValue);
-            console.log("Question value:", questionValue);
-
-            console.log("Successfully loaded all match data");
-          } else {
-            console.log("Not enough values in CSV. Expected >= 19, got:", values.length);
+            console.log("Successfully loaded match data");
           }
         } catch (error) {
           console.error('Error loading match data:', error);
-          console.error('Error details:', error.message);
         }
       }
     };
@@ -146,9 +131,87 @@ const MatchScreen = props => {
         console.log("Error loading driver station:", err);
       }
     };
-    
+
     loadDriverStation();
   }, []);
+
+  const updateAutoFuel = (amount) => {
+    const newValue = autoFuelScored + amount;
+    if (newValue >= 0) {
+      setAutoFuelScored(newValue);
+      // Accumulate the change
+      setRecentAutoChange(prev => (prev || 0) + amount);
+
+      // Clear previous timeout
+      if (autoTimeoutRef.current) clearTimeout(autoTimeoutRef.current);
+
+      // Reset and start timer animation
+      autoTimerAnim.setValue(1);
+      Animated.timing(autoTimerAnim, {
+        toValue: 0,
+        duration: 10000,
+        useNativeDriver: false,
+      }).start();
+
+      // Set new timeout to hide after 10 seconds
+      autoTimeoutRef.current = setTimeout(() => {
+        setRecentAutoChange(null);
+      }, 10000);
+    }
+  };
+
+  const updateTeleOpFuel = (amount) => {
+    const newValue = teleOpFuelScored + amount;
+    if (newValue >= 0) {
+      setTeleOpFuelScored(newValue);
+      // Accumulate the change
+      setRecentTeleOpChange(prev => (prev || 0) + amount);
+
+      // Clear previous timeout
+      if (teleOpTimeoutRef.current) clearTimeout(teleOpTimeoutRef.current);
+
+      // Reset and start timer animation
+      teleOpTimerAnim.setValue(1);
+      Animated.timing(teleOpTimerAnim, {
+        toValue: 0,
+        duration: 10000,
+        useNativeDriver: false,
+      }).start();
+
+      // Set new timeout to hide after 10 seconds
+      teleOpTimeoutRef.current = setTimeout(() => {
+        setRecentTeleOpChange(null);
+      }, 10000);
+    }
+  };
+
+  const saveMatchData = async () => {
+    try {
+      const match = route.params.matchNum;
+      const csvURI = `${FileSystem.documentDirectory}match${match}.csv`;
+      let currData = await FileSystem.readAsStringAsync(csvURI);
+
+      // Split and get team info (first 7 fields)
+      const values = currData.split(',');
+      const teamInfo = values.slice(0, 7).join(',');
+
+      // Build the new data string
+      const newData = [
+        teamInfo,
+        autoFuelScored,
+        teleOpFuelScored,
+        `"${commentValue || ''}"`,
+        `"${questionValue || ''}"`,
+      ].join(',');
+
+      await FileSystem.writeAsStringAsync(csvURI, newData);
+      console.log("Saved data:", newData);
+      return newData;
+    } catch (error) {
+      console.error("Error saving data:", error);
+      return null;
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -158,46 +221,11 @@ const MatchScreen = props => {
           <TouchableOpacity
             style={styles.backButton}
             onPress={async () => {
-              try {
-                // Save all match data before going back
-                const match = route.params.matchNum;
-                const csvURI = `${FileSystem.documentDirectory}match${match}.csv`;
-                let currData = await FileSystem.readAsStringAsync(csvURI);
-                
-                // Split and get team info (first 7 fields)
-                const values = currData.split(',');
-                const teamInfo = values.slice(0, 7).join(',');
-                
-                // Build the new data string with proper formatting
-                const newData = [
-                  teamInfo,
-                  autoL1Coral,
-                  autoL2Coral,
-                  autoL3Coral,
-                  autoL4Coral,
-                  autoAlgaeProcessor,
-                  autoAlgaeNet,
-                  teleOpL1Coral,
-                  teleOpL2Coral,
-                  teleOpL3Coral,
-                  teleOpL4Coral,
-                  teleOpAlgaeProcessor,
-                  teleOpAlgaeNet,
-                  removedAlgae ? 1 : 0,
-                  `"${commentValue || ''}"`,
-                  `"${questionValue || ''}"`,
-                ].join(',');
-                
-                await FileSystem.writeAsStringAsync(csvURI, newData);
-                console.log("Saved data:", newData);
-                
-                navigation.goBack();
-              } catch (error) {
-                console.error("Error saving data:", error);
-              }
+              await saveMatchData();
+              navigation.goBack();
             }}
           >
-            <Text style={styles.backButtonText}>⬅</Text>
+            <Text style={styles.backButtonText}>←</Text>
           </TouchableOpacity>
           <Text style={styles.title}>Match {route.params.matchNum}</Text>
           <View style={styles.headerButtons}>
@@ -205,7 +233,7 @@ const MatchScreen = props => {
               style={styles.questionButton}
               onPress={() => setIsQuestionModalVisible(true)}
             >
-              <MaterialIcons name="help" size={30} color="#FFD700" />
+              <MaterialIcons name="help" size={30} color={colors.primary} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.commentButton}
@@ -220,162 +248,70 @@ const MatchScreen = props => {
         </View>
       </View>
 
-      {/* Team Number Header - Now outside ScrollView */}
+      {/* Team Number Header */}
       <View style={[
         styles.teamHeaderContainer,
         driverStation && { backgroundColor: getAllianceColor(driverStation) }
       ]}>
         <Text style={[
           styles.teamHeader,
-          driverStation && { 
-            color: driverStation?.charAt(0) === 'R' ? '#cc0000' : '#0000cc'
-          }
+          { color: getAllianceTextColor(driverStation) }
         ]}>
           Team {route.params.teamNum}
         </Text>
       </View>
 
       {/* Main Content */}
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollViewContent}
         keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={true}
-        bounces={true}
       >
         <View style={styles.mainContent}>
-          {/* Auto Section */}
+          {/* Auto Fuel Section */}
           <View style={[styles.section, styles.autoSection]}>
-            <TouchableOpacity
-              style={[styles.sectionHeader, styles.autoHeader]}
-              onPress={() => setIsAutoExpanded(!isAutoExpanded)}
-            >
-              <Text style={styles.sectionTitle}>Autonomous</Text>
-              <Text style={styles.expandButton}>
-                {isAutoExpanded ? '−' : '+'}
-              </Text>
-            </TouchableOpacity>
-            
-            {isAutoExpanded && (
-              <View style={styles.sectionContent}>
-                <CounterItem
-                  label="L4 Coral (High)"
-                  value={autoL4Coral}
-                  onIncrement={() => updateStat(1, autoL4Coral, setAutoL4Coral)}
-                  onDecrement={() => updateStat(-1, autoL4Coral, setAutoL4Coral)}
-                />
-                <CounterItem
-                  label="L3 Coral (Middle)"
-                  value={autoL3Coral}
-                  onIncrement={() => updateStat(1, autoL3Coral, setAutoL3Coral)}
-                  onDecrement={() => updateStat(-1, autoL3Coral, setAutoL3Coral)}
-                />
-                <CounterItem
-                  label="L2 Coral (Low)"
-                  value={autoL2Coral}
-                  onIncrement={() => updateStat(1, autoL2Coral, setAutoL2Coral)}
-                  onDecrement={() => updateStat(-1, autoL2Coral, setAutoL2Coral)}
-                />
-                <CounterItem
-                  label="L1 Coral (Trough)"
-                  value={autoL1Coral}
-                  onIncrement={() => updateStat(1, autoL1Coral, setAutoL1Coral)}
-                  onDecrement={() => updateStat(-1, autoL1Coral, setAutoL1Coral)}
-                  showDivider={true}
-                />
-                <CounterItem
-                  label="Algae Net"
-                  value={autoAlgaeNet}
-                  onIncrement={() => updateStat(1, autoAlgaeNet, setAutoAlgaeNet)}
-                  onDecrement={() => updateStat(-1, autoAlgaeNet, setAutoAlgaeNet)}
-                />
-                <CounterItem
-                  label="Algae Processor"
-                  value={autoAlgaeProcessor}
-                  onIncrement={() => updateStat(1, autoAlgaeProcessor, setAutoAlgaeProcessor)}
-                  onDecrement={() => updateStat(-1, autoAlgaeProcessor, setAutoAlgaeProcessor)}
-                />
-              </View>
-            )}
+            <View style={[styles.sectionHeader, styles.autoHeader]}>
+              <Text style={[styles.sectionTitle, isTablet && styles.sectionTitleTablet]}>Auto Fuel Scored</Text>
+            </View>
+            <View style={[styles.sectionContent, isTablet && styles.sectionContentTablet]}>
+              <FuelCounter
+                value={autoFuelScored}
+                onUpdate={updateAutoFuel}
+                isTablet={isTablet}
+                recentChange={recentAutoChange}
+                timerAnim={autoTimerAnim}
+              />
+            </View>
           </View>
 
-          {/* TeleOp Section */}
+          {/* TeleOp Fuel Section */}
           <View style={[styles.section, styles.teleOpSection]}>
-            <TouchableOpacity
-              style={[styles.sectionHeader, styles.teleOpHeader]}
-              onPress={() => setIsTeleOpExpanded(!isTeleOpExpanded)}
-            >
-              <Text style={styles.sectionTitle}>Tele-Op</Text>
-              <Text style={styles.expandButton}>
-                {isTeleOpExpanded ? '−' : '+'}
-              </Text>
-            </TouchableOpacity>
-            
-            {isTeleOpExpanded && (
-              <View style={styles.sectionContent}>
-                <CounterItem
-                  label="L4 Coral (High)"
-                  value={teleOpL4Coral}
-                  onIncrement={() => updateStat(1, teleOpL4Coral, setTeleOpL4Coral)}
-                  onDecrement={() => updateStat(-1, teleOpL4Coral, setTeleOpL4Coral)}
-                />
-                <CounterItem
-                  label="L3 Coral (Middle)"
-                  value={teleOpL3Coral}
-                  onIncrement={() => updateStat(1, teleOpL3Coral, setTeleOpL3Coral)}
-                  onDecrement={() => updateStat(-1, teleOpL3Coral, setTeleOpL3Coral)}
-                />
-                <CounterItem
-                  label="L2 Coral (Low)"
-                  value={teleOpL2Coral}
-                  onIncrement={() => updateStat(1, teleOpL2Coral, setTeleOpL2Coral)}
-                  onDecrement={() => updateStat(-1, teleOpL2Coral, setTeleOpL2Coral)}
-                />
-                <CounterItem
-                  label="L1 Coral (Trough)"
-                  value={teleOpL1Coral}
-                  onIncrement={() => updateStat(1, teleOpL1Coral, setTeleOpL1Coral)}
-                  onDecrement={() => updateStat(-1, teleOpL1Coral, setTeleOpL1Coral)}
-                  showDivider={true}
-                />
-                <CounterItem
-                  label="Algae Net"
-                  value={teleOpAlgaeNet}
-                  onIncrement={() => updateStat(1, teleOpAlgaeNet, setTeleOpAlgaeNet)}
-                  onDecrement={() => updateStat(-1, teleOpAlgaeNet, setTeleOpAlgaeNet)}
-                />
-                <CounterItem
-                  label="Algae Processor"
-                  value={teleOpAlgaeProcessor}
-                  onIncrement={() => updateStat(1, teleOpAlgaeProcessor, setTeleOpAlgaeProcessor)}
-                  onDecrement={() => updateStat(-1, teleOpAlgaeProcessor, setTeleOpAlgaeProcessor)}
-                />
-                <TouchableOpacity 
-                  style={styles.checkboxContainer}
-                  onPress={() => setRemovedAlgae(!removedAlgae)}
-                  activeOpacity={0.7}
-                >
-                  <Checkbox
-                    style={styles.checkbox}
-                    value={removedAlgae}
-                    onValueChange={setRemovedAlgae}
-                    color={removedAlgae ? '#000000' : undefined}
-                  />
-                  <Text style={styles.checkboxLabel}>Removed Algae From Reef</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+            <View style={[styles.sectionHeader, styles.teleOpHeader]}>
+              <Text style={[styles.sectionTitle, isTablet && styles.sectionTitleTablet]}>TeleOp Fuel Scored</Text>
+            </View>
+            <View style={[styles.sectionContent, isTablet && styles.sectionContentTablet]}>
+              <FuelCounter
+                value={teleOpFuelScored}
+                onUpdate={updateTeleOpFuel}
+                isTablet={isTablet}
+                recentChange={recentTeleOpChange}
+                timerAnim={teleOpTimerAnim}
+              />
+            </View>
           </View>
 
           {/* Submit Button */}
           <TouchableOpacity
             style={styles.submitButton}
             onPress={async () => {
-              await matchSubmit();
-              navigation.navigate("QRCode", {
-                matchNum: route.params.matchNum,
-                data: await getDataString(),
-              });
+              const data = await saveMatchData();
+              if (data) {
+                await Clipboard.setStringAsync(data);
+                navigation.navigate("QRCode", {
+                  matchNum: route.params.matchNum,
+                  data: data,
+                });
+              }
             }}
           >
             <Text style={styles.buttonText}>Submit Match</Text>
@@ -402,6 +338,7 @@ const MatchScreen = props => {
                   onChangeText={setCommentValue}
                   placeholder={"Enter match comments..."}
                   placeholderTextColor="rgba(255, 215, 0, 0.5)"
+                  autoFocus={true}
                 />
                 <View style={styles.modalButtons}>
                   <TouchableOpacity
@@ -428,7 +365,7 @@ const MatchScreen = props => {
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback>
               <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>Questions/Clarifications {questionValue}</Text>
+                <Text style={styles.modalTitle}>Questions/Clarifications</Text>
                 <TextInput
                   style={styles.modalInput}
                   multiline
@@ -436,6 +373,7 @@ const MatchScreen = props => {
                   onChangeText={setQuestionValue}
                   placeholder="Enter questions or clarifications..."
                   placeholderTextColor="rgba(255, 215, 0, 0.5)"
+                  autoFocus={true}
                 />
                 <View style={styles.modalButtons}>
                   <TouchableOpacity
@@ -452,104 +390,83 @@ const MatchScreen = props => {
       </Modal>
     </SafeAreaView>
   );
-
-  async function matchSubmit() {
-    try {
-      const match = route.params.matchNum;
-      const csvURI = `${FileSystem.documentDirectory}match${match}.csv`;
-      let currData = await FileSystem.readAsStringAsync(csvURI);
-      
-      // Split and get team info (first 7 fields)
-      const values = currData.split(',');
-      const teamInfo = values.slice(0, 7).join(',');
-      
-      // Build the new data string with proper formatting
-      const newData = [
-        teamInfo,
-        autoL1Coral,
-        autoL2Coral,
-        autoL3Coral,
-        autoL4Coral,
-        autoAlgaeProcessor,
-        autoAlgaeNet,
-        teleOpL1Coral,
-        teleOpL2Coral,
-        teleOpL3Coral,
-        teleOpL4Coral,
-        teleOpAlgaeProcessor,
-        teleOpAlgaeNet,
-        removedAlgae ? 1 : 0,
-        `"${commentValue || ''}"`,
-        `"${questionValue || ''}"`,
-      ].join(',');
-      
-      await FileSystem.writeAsStringAsync(csvURI, newData);
-      console.log("Saved data on submit:", newData);
-      
-      await Clipboard.setStringAsync(newData);
-    } catch (error) {
-      console.error("Error submitting match:", error);
-    }
-  }
-
-  async function getDataString() {
-    let match = route.params.matchNum;
-    let csvURI = `${FileSystem.documentDirectory}match${match}.csv`;
-    let dataString = await FileSystem.readAsStringAsync(csvURI);
-
-    console.log(dataString);
-
-    return dataString;
-  }
-
-  function updateStat(num, stat, setStat) {
-    let target = stat + num;
-    if (target >= 0) {
-      setStat(target);
-    }
-  }
 }
 
-// Counter component for reusability
-const CounterItem = ({ label, value, onIncrement, onDecrement, showDivider }) => (
-  <View>
-    <View style={styles.counterContainer}>
-      <Text style={styles.counterLabel}>{label}</Text>
-      <View style={styles.counterControls}>
-        <TouchableOpacity 
-          style={[styles.counterButton, styles.decrementButton]} 
-          onPress={onDecrement}
-        >
-          <Text style={styles.counterButtonText}>−</Text>
-        </TouchableOpacity>
-        <Text style={styles.counterValue}>{value}</Text>
-        <TouchableOpacity 
-          style={[styles.counterButton, styles.incrementButton]} 
-          onPress={onIncrement}
-        >
-          <Image
-            source={require("../assets/images/plus-icon.png")}
-            style={styles.buttonIcon}
-          />
-        </TouchableOpacity>
+// Fuel counter component with -10, -1, value, +1, +10 buttons
+const FuelCounter = ({ value, onUpdate, isTablet, recentChange, timerAnim }) => (
+  <View style={styles.fuelCounterContainer}>
+    <View style={styles.fuelCounterRow}>
+      <TouchableOpacity
+        style={[styles.fuelButton, styles.decrementButton, isTablet && styles.fuelButtonTablet]}
+        onPress={() => onUpdate(-10)}
+      >
+        <Text style={[styles.fuelButtonText, isTablet && styles.fuelButtonTextTablet]}>-10</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.fuelButton, styles.decrementButton, isTablet && styles.fuelButtonTablet]}
+        onPress={() => onUpdate(-1)}
+      >
+        <Text style={[styles.fuelButtonText, isTablet && styles.fuelButtonTextTablet]}>-1</Text>
+      </TouchableOpacity>
+      <View style={[styles.fuelValueContainer, isTablet && styles.fuelValueContainerTablet]}>
+        <Text style={[styles.fuelValue, isTablet && styles.fuelValueTablet]}>{value}</Text>
       </View>
+      <TouchableOpacity
+        style={[styles.fuelButton, styles.incrementButton, isTablet && styles.fuelButtonTablet]}
+        onPress={() => onUpdate(1)}
+      >
+        <Text style={[styles.fuelButtonText, isTablet && styles.fuelButtonTextTablet]}>+1</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.fuelButton, styles.incrementButton, isTablet && styles.fuelButtonTablet]}
+        onPress={() => onUpdate(10)}
+      >
+        <Text style={[styles.fuelButtonText, isTablet && styles.fuelButtonTextTablet]}>+10</Text>
+      </TouchableOpacity>
     </View>
-    {showDivider && <View style={styles.divider} />}
+    {/* Recent change indicator */}
+    <View style={[styles.recentChangeContainer, isTablet && styles.recentChangeContainerTablet]}>
+      {recentChange !== null && (
+        <Text style={[
+          styles.recentChangeText,
+          isTablet && styles.recentChangeTextTablet,
+          recentChange > 0 ? styles.recentChangePositive : styles.recentChangeNegative
+        ]}>
+          {recentChange > 0 ? `+${recentChange}` : recentChange}
+        </Text>
+      )}
+    </View>
+    {/* Timer bar */}
+    {recentChange !== null && (
+      <View style={styles.timerBarContainer}>
+        <Animated.View
+          style={[
+            styles.timerBar,
+            {
+              width: timerAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['0%', '100%'],
+              }),
+            },
+          ]}
+        />
+      </View>
+    )}
   </View>
 );
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff00d",
+    backgroundColor: colors.background,
   },
 
   headerContainer: {
-    backgroundColor: '#fff00d',
+    backgroundColor: colors.background,
     borderBottomWidth: 2,
-    borderBottomColor: '#000000',
-    height: Platform.OS === "android" ? 
-      StatusBar.currentHeight + 70 : 
+    borderBottomColor: colors.black,
+    height: Platform.OS === "android" ?
+      StatusBar.currentHeight + 70 :
       80,
   },
 
@@ -565,13 +482,13 @@ const styles = StyleSheet.create({
   },
 
   backButton: {
-    backgroundColor: '#000000',
+    backgroundColor: colors.black,
     width: 48,
     height: 48,
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: "#000",
+    shadowColor: colors.black,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -583,7 +500,7 @@ const styles = StyleSheet.create({
 
   backButtonText: {
     fontSize: 27,
-    color: '#FFD700',
+    color: colors.primary,
     fontWeight: '900',
     lineHeight: 48,
     width: 48,
@@ -595,7 +512,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 28,
     fontFamily: 'Cooper-Black',
-    color: "#000000",
+    color: colors.black,
     textAlign: "center",
   },
 
@@ -606,7 +523,7 @@ const styles = StyleSheet.create({
   },
 
   questionButton: {
-    backgroundColor: '#000000',
+    backgroundColor: colors.black,
     width: 48,
     height: 48,
     borderRadius: 24,
@@ -615,7 +532,7 @@ const styles = StyleSheet.create({
   },
 
   commentButton: {
-    backgroundColor: '#000000',
+    backgroundColor: colors.black,
     width: 48,
     height: 48,
     borderRadius: 24,
@@ -626,12 +543,12 @@ const styles = StyleSheet.create({
   commentIcon: {
     width: 30,
     height: 30,
-    tintColor: '#FFD700',
+    tintColor: colors.primary,
   },
 
   scrollView: {
     flex: 1,
-    backgroundColor: '#fff00d',
+    backgroundColor: colors.background,
   },
 
   scrollViewContent: {
@@ -642,14 +559,13 @@ const styles = StyleSheet.create({
 
   mainContent: {
     flex: 1,
-    minHeight: '100%',
   },
 
   teamHeaderContainer: {
     padding: 15,
     borderBottomWidth: 2,
-    borderBottomColor: '#000000',
-    backgroundColor: '#fff00d',
+    borderBottomColor: colors.black,
+    backgroundColor: colors.surface,
     zIndex: 1,
   },
 
@@ -657,28 +573,29 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     textAlign: 'center',
+    color: colors.textPrimary,
   },
 
   section: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderRadius: 20,
     marginBottom: 20,
-    shadowColor: "#000000",
+    shadowColor: colors.black,
     shadowOffset: {
       width: 0,
       height: 8,
     },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 5,
   },
 
   autoSection: {
-    backgroundColor: '#fff0d9', // More noticeable warm color for Auto
+    backgroundColor: colors.surface,
   },
 
   teleOpSection: {
-    backgroundColor: '#ffffff', // Keep TeleOp white
+    backgroundColor: colors.surface,
   },
 
   sectionHeader: {
@@ -687,103 +604,178 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    position: 'relative',
+    borderBottomColor: colors.surfaceBorder,
   },
 
   autoHeader: {
-    backgroundColor: '#ffe0b3', // Darker warm color for auto header
+    backgroundColor: 'rgba(255, 180, 50, 0.3)',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
 
   teleOpHeader: {
-    backgroundColor: '#f0f0f0', // Slightly darker gray for teleop header
+    backgroundColor: colors.surfaceLight,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
 
   sectionTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     textAlign: 'center',
+    color: colors.textPrimary,
+  },
+
+  sectionTitleTablet: {
+    fontSize: 28,
   },
 
   sectionContent: {
-    padding: 20,
+    padding: 16,
   },
 
-  counterContainer: {
-    marginBottom: 20,
+  sectionContentTablet: {
+    padding: 30,
   },
 
-  counterLabel: {
-    fontSize: 22,
-    marginBottom: 12,
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-
-  counterControls: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  // Fuel counter styles
+  fuelCounterContainer: {
     alignItems: 'center',
+    width: '100%',
   },
 
-  counterButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+  fuelCounterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+
+  fuelButton: {
+    flex: 1,
+    height: 50,
+    marginHorizontal: 3,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: "#000",
+    borderRadius: 10,
+    shadowColor: colors.black,
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
+  },
+
+  fuelButtonTablet: {
+    height: 80,
+    marginHorizontal: 8,
+    borderRadius: 16,
   },
 
   decrementButton: {
-    backgroundColor: '#FFBCBC',
+    backgroundColor: colors.redlight,
   },
 
   incrementButton: {
-    backgroundColor: '#C6FFBD',
+    backgroundColor: colors.greenlight,
   },
 
-  counterValue: {
-    fontSize: 28,
+  fuelButtonText: {
+    fontSize: 16,
     fontWeight: 'bold',
-    minWidth: 50,
-    textAlign: 'center',
+    color: colors.black,
   },
 
-  buttonIcon: {
-    width: 24,
+  fuelButtonTextTablet: {
+    fontSize: 26,
+  },
+
+  fuelValueContainer: {
+    minWidth: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 4,
+  },
+
+  fuelValueContainerTablet: {
+    minWidth: 100,
+    marginHorizontal: 16,
+  },
+
+  fuelValue: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: colors.textPrimary,
+  },
+
+  fuelValueTablet: {
+    fontSize: 56,
+  },
+
+  recentChangeContainer: {
     height: 24,
+    marginTop: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  recentChangeContainerTablet: {
+    height: 36,
+    marginTop: 12,
+  },
+
+  recentChangeText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+
+  recentChangeTextTablet: {
+    fontSize: 26,
+  },
+
+  recentChangePositive: {
+    color: '#22aa22',
+  },
+
+  recentChangeNegative: {
+    color: '#cc4444',
+  },
+
+  timerBarContainer: {
+    width: '100%',
+    height: 4,
+    backgroundColor: colors.surfaceBorder,
+    borderRadius: 2,
+    marginTop: 8,
+    overflow: 'hidden',
+  },
+
+  timerBar: {
+    height: '100%',
+    backgroundColor: colors.primary,
+    borderRadius: 2,
   },
 
   submitButton: {
-    backgroundColor: '#000000',
+    backgroundColor: colors.buttonPrimary,
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
     marginVertical: 20,
-    shadowColor: "#000",
+    shadowColor: colors.black,
     shadowOffset: {
       width: 0,
       height: 4,
     },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 3,
   },
 
   buttonText: {
-    color: '#FFD700',
+    color: colors.textOnPrimary,
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -801,14 +793,14 @@ const styles = StyleSheet.create({
   },
 
   modalContent: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderRadius: 20,
     padding: 24,
     width: '90%',
     maxWidth: 400,
     maxHeight: '80%',
     elevation: 5,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -816,6 +808,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     zIndex: 1001,
+    borderWidth: 2,
+    borderColor: colors.primary,
   },
 
   modalTitle: {
@@ -823,17 +817,20 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 16,
     textAlign: 'center',
+    color: colors.textPrimary,
   },
 
   modalInput: {
-    backgroundColor: '#1a1a1a',
-    color: '#FFD700',
+    backgroundColor: colors.surfaceLight,
+    color: colors.textPrimary,
     borderRadius: 12,
     padding: 16,
     height: 300,
     fontSize: 16,
     textAlignVertical: 'top',
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
   },
 
   modalButtons: {
@@ -848,64 +845,14 @@ const styles = StyleSheet.create({
   },
 
   cancelButton: {
-    backgroundColor: '#666666',
+    backgroundColor: colors.buttonSecondary,
   },
 
   modalButtonText: {
-    color: '#FFD700',
+    color: colors.textPrimary,
     fontSize: 16,
     fontWeight: 'bold',
-  },
-
-  counterButtonText: {
-    fontSize: 30,
-    color: '#000000',
-    fontWeight: 'bold',
-    lineHeight: 30,
-  },
-
-  expandButton: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#666',
-    position: 'absolute',
-    right: 20,
-  },
-
-  checkboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 20,
-    marginBottom: 20,
-    paddingVertical: 15,
-    paddingHorizontal: 5,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    borderRadius: 12,
-  },
-
-  checkbox: {
-    margin: 8,
-    width: 36,
-    height: 36,
-    borderRadius: 6,
-  },
-
-  checkboxLabel: {
-    fontSize: 20,
-    marginLeft: 12,
-    fontWeight: '500',
-  },
-
-  divider: {
-    height: 2,
-    borderStyle: 'dashed',
-    borderWidth: 1,
-    borderColor: '#999',
-    marginVertical: 15,
-    marginHorizontal: 20,
   },
 });
 
 export default MatchScreen;
-

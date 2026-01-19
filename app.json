@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "ScoutingApp2025",
-    "slug": "scouting-2025",
-    "version": "1.0.0",
+    "name": "ScoutingApp2026",
+    "slug": "scouting-2026",
+    "version": "2026.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -22,7 +22,7 @@
       }
     },
     "android": {
-      "package": "com.brennan.ScoutingApp2025",
+      "package": "com.brennan.ScoutingApp2026",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"

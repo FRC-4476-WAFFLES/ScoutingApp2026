@@ -13,7 +13,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
+import { colors } from "../components/colors";
 
 const SettingsScreen = (props) => {
   const { navigation } = props;
@@ -412,8 +413,8 @@ const SettingsScreen = (props) => {
           <View style={styles.sectionFlexRow}>
             <Text style={styles.sectionTitle}>Practice Mode</Text>
             <Switch
-              trackColor={{ false: "#666666", true: "#000000" }}
-              thumbColor={isPracticeMode ? "#FFD700" : "#F6F6F6"}
+              trackColor={{ false: colors.buttonSecondary, true: colors.black }}
+              thumbColor={isPracticeMode ? colors.primary : colors.graylight}
               onValueChange={handlePracticeModeChange}
               value={isPracticeMode}
             />
@@ -461,12 +462,12 @@ const SettingsScreen = (props) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff00d",
+    backgroundColor: colors.background,
   },
 
   headerContainer: {
     borderBottomWidth: 2,
-    borderBottomColor: "#000000",
+    borderBottomColor: colors.black,
     height: Platform.OS === "android" ? StatusBar.currentHeight + 70 : 80,
   },
 
@@ -494,19 +495,19 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 28,
     fontFamily: "Cooper-Black",
-    color: "#000000",
+    color: colors.black,
     textAlign: "center",
     marginRight: 32,
   },
 
   backButton: {
-    backgroundColor: "#000000",
+    backgroundColor: colors.black,
     width: 48,
     height: 48,
     borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
+    shadowColor: colors.black,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -518,7 +519,7 @@ const styles = StyleSheet.create({
 
   backButtonText: {
     fontSize: 30,
-    color: "#FFD700",
+    color: colors.primary,
     fontWeight: "900",
     textAlign: "center",
     textAlignVertical: "center",
@@ -527,15 +528,15 @@ const styles = StyleSheet.create({
 
   section: {
     marginBottom: 24,
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     borderRadius: 20,
     padding: 24,
-    shadowColor: "#000000",
+    shadowColor: colors.black,
     shadowOffset: {
       width: 0,
       height: 8,
     },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 5,
   },
@@ -543,7 +544,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#000000",
+    color: colors.textPrimary,
     marginBottom: 5,
   },
 
@@ -566,13 +567,14 @@ const styles = StyleSheet.create({
 
   input: {
     flex: 1,
-    backgroundColor: "#1a1a1a",
-    color: "#FFD700",
+    backgroundColor: colors.surfaceLight,
+    color: colors.textPrimary,
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
     marginBottom: 10,
-    placeholderTextColor: "rgba(255, 215, 0, 0.5)",
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
   },
 
   checkmark: {
@@ -582,17 +584,17 @@ const styles = StyleSheet.create({
   },
 
   button: {
-    backgroundColor: "#000000",
+    backgroundColor: colors.buttonPrimary,
     padding: 16,
     borderRadius: 12,
     alignItems: "center",
     marginTop: 10,
-    shadowColor: "#000",
+    shadowColor: colors.black,
     shadowOffset: {
       width: 0,
       height: 4,
     },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 3,
   },
@@ -608,28 +610,28 @@ const styles = StyleSheet.create({
   },
 
   whiteText: {
-    color: "#ffffff",
+    color: colors.white,
   },
 
   blackText: {
-    color: "#000000",
+    color: colors.textOnPrimary,
   },
 
   yellowText: {
-    color: "#FFD700",
+    color: colors.textOnPrimary,
   },
 
   stationPicker: {
     marginTop: 10,
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surfaceLight,
     borderRadius: 12,
     overflow: "hidden",
-    shadowColor: "#000000",
+    shadowColor: colors.black,
     shadowOffset: {
       width: 0,
       height: 4,
     },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 3,
   },
@@ -641,11 +643,11 @@ const styles = StyleSheet.create({
   },
 
   redStations: {
-    backgroundColor: "rgba(255, 0, 0, 0.4)",
+    backgroundColor: colors.redAlliance,
   },
 
   blueStations: {
-    backgroundColor: "rgba(0, 0, 255, 0.4)",
+    backgroundColor: colors.blueAlliance,
   },
 
   stationOption: {
@@ -661,7 +663,7 @@ const styles = StyleSheet.create({
   },
 
   eventCodeDisplay: {
-    backgroundColor: "rgba(0, 0, 0, 0.05)",
+    backgroundColor: colors.surfaceLight,
     borderRadius: 12,
     padding: 12,
     marginBottom: 16,
@@ -672,13 +674,13 @@ const styles = StyleSheet.create({
 
   eventCodeLabel: {
     fontSize: 16,
-    color: "#666666",
+    color: colors.textSecondary,
     marginRight: 8,
   },
 
   helperText: {
     fontSize: 14,
-    color: "#666666",
+    color: colors.textSecondary,
     textAlign: "center",
     marginBottom: 10,
   },

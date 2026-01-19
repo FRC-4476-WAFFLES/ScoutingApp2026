@@ -14,8 +14,9 @@ import QRCode from "react-qr-code";
 import * as MediaLibrary from 'expo-media-library';
 import ViewShot from "react-native-view-shot";
 import { captureRef } from 'react-native-view-shot';
+import { colors } from "../components/colors";
 
-const CSV_HEADERS = "Team Number,Match Number,TMA Key,Driver Station,Alliance,Scout Name,HP at Processor,Auto L1 Coral,Auto L2 Coral,Auto L3 Coral,Auto L4 Coral,Auto Algae Processor,Auto Algae Net,TeleOp L1 Coral,TeleOp L2 Coral,TeleOp L3 Coral,TeleOp L4 Coral,TeleOp Algae Processor,TeleOp Algae Net,Removed Algae,Match Comments,Questions/Clarifications";
+const CSV_HEADERS = "Team Number,Match Number,TMA Key,Driver Station,Alliance,Scout Name,Pre-Game Comment,Auto Fuel Scored,TeleOp Fuel Scored,Match Comments,Questions/Clarifications";
 
 export const getCSVHeaders = () => CSV_HEADERS;
 
@@ -50,37 +51,21 @@ const QRCodeScreen = props => {
       { header: 'Driver Station', index: 3 },
       { header: 'Alliance', index: 4 },
       { header: 'Scout Name', index: 5 },
-      { header: 'HP at Processor', index: 6, isBoolean: true },
-      { header: 'Auto L1 Coral', index: 7 },
-      { header: 'Auto L2 Coral', index: 8 },
-      { header: 'Auto L3 Coral', index: 9 },
-      { header: 'Auto L4 Coral', index: 10 },
-      { header: 'Auto Algae Processor', index: 11 },
-      { header: 'Auto Algae Net', index: 12 },
-      { header: 'TeleOp L1 Coral', index: 13 },
-      { header: 'TeleOp L2 Coral', index: 14 },
-      { header: 'TeleOp L3 Coral', index: 15 },
-      { header: 'TeleOp L4 Coral', index: 16 },
-      { header: 'TeleOp Algae Processor', index: 17 },
-      { header: 'TeleOp Algae Net', index: 18 },
-      { header: 'Removed Algae', index: 19, isBoolean: true },
-      { header: 'Match Comments', index: 20 },
-      { header: 'Questions/Clarifications', index: 21 }
+      { header: 'Pre-Game Comment', index: 6 },
+      { header: 'Auto Fuel Scored', index: 7 },
+      { header: 'TeleOp Fuel Scored', index: 8 },
+      { header: 'Match Comments', index: 9 },
+      { header: 'Questions/Clarifications', index: 10 }
     ];
 
     return (
       <View style={styles.tableContainer}>
         <Text style={styles.tableTitle}>Match Data Details</Text>
-        {dataMapping.map(({ header, index, isBoolean }) => (
+        {dataMapping.map(({ header, index }) => (
           <View key={`${header}-${index}`} style={styles.tableRow}>
             <Text style={styles.tableHeader}>{header}:</Text>
             <Text style={styles.tableValue}>
-              {isBoolean ? 
-                (() => {
-                  console.log(`Checking boolean value for ${header}:`, values[index]);
-                  return values[index] === '1' ? 'Yes' : 'No';
-                })() :
-                values[index]?.replace(/^"|"$/g, '') || '-'}
+              {values[index]?.replace(/^"|"$/g, '') || '-'}
             </Text>
           </View>
         ))}
@@ -110,7 +95,7 @@ const QRCodeScreen = props => {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.backButtonText}>⬅</Text>
+            <Text style={styles.backButtonText}>←</Text>
           </TouchableOpacity>
           <Text style={styles.title}>QR Code</Text>
           <View style={{width: 32}} />
@@ -228,15 +213,15 @@ const QRCodeScreen = props => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff00d",
+    backgroundColor: colors.background,
   },
 
   headerContainer: {
-    backgroundColor: '#fff00d',
+    backgroundColor: colors.background,
     borderBottomWidth: 2,
-    borderBottomColor: '#000000',
-    height: Platform.OS === "android" ? 
-      StatusBar.currentHeight + 70 : 
+    borderBottomColor: colors.black,
+    height: Platform.OS === "android" ?
+      StatusBar.currentHeight + 70 :
       80,
   },
 
@@ -252,13 +237,13 @@ const styles = StyleSheet.create({
   },
 
   backButton: {
-    backgroundColor: '#000000',
+    backgroundColor: colors.black,
     width: 48,
     height: 48,
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: "#000",
+    shadowColor: colors.black,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -270,7 +255,7 @@ const styles = StyleSheet.create({
 
   backButtonText: {
     fontSize: 30,
-    color: '#FFD700',
+    color: colors.primary,
     fontWeight: '900',
     textAlign: 'center',
     textAlignVertical: 'center',
@@ -282,13 +267,13 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 28,
     fontFamily: 'Cooper-Black',
-    color: "#000000",
+    color: colors.black,
     textAlign: "center",
   },
 
   scrollView: {
     flex: 1,
-    backgroundColor: '#fff00d',
+    backgroundColor: colors.background,
   },
 
   scrollViewContent: {
@@ -296,17 +281,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
+  // Keep white background for QR code readability
   qrcodeContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.white,
     padding: 25,
     borderRadius: 20,
     marginVertical: 20,
-    shadowColor: "#000000",
+    shadowColor: colors.black,
     shadowOffset: {
       width: 0,
       height: 8,
     },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 5,
     width: '100%',
@@ -314,7 +300,7 @@ const styles = StyleSheet.create({
   },
 
   qrCodeWrapper: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.white,
     padding: 15,
     alignItems: 'center',
     justifyContent: 'center',
@@ -326,17 +312,17 @@ const styles = StyleSheet.create({
   },
 
   dataContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     width: '100%',
     padding: 20,
     borderRadius: 20,
     marginBottom: 20,
-    shadowColor: "#000000",
+    shadowColor: colors.black,
     shadowOffset: {
       width: 0,
       height: 8,
     },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 5,
   },
@@ -345,53 +331,55 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
+    color: colors.textPrimary,
   },
 
   dataText: {
     fontSize: 16,
     marginBottom: 10,
+    color: colors.textPrimary,
   },
 
   csvText: {
     fontSize: 12,
-    color: '#666',
+    color: colors.textSecondary,
     marginTop: 10,
   },
 
   actionButton: {
-    backgroundColor: '#000000',
+    backgroundColor: colors.buttonPrimary,
     padding: 16,
     borderRadius: 12,
     width: '100%',
     alignItems: 'center',
     marginBottom: 16,
-    shadowColor: "#000",
+    shadowColor: colors.black,
     shadowOffset: {
       width: 0,
       height: 4,
     },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 3,
   },
 
   buttonText: {
-    color: '#FFD700',
+    color: colors.textOnPrimary,
     fontSize: 18,
     fontWeight: 'bold',
   },
 
   tableContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     padding: 20,
     borderRadius: 20,
     marginBottom: 20,
-    shadowColor: "#000000",
+    shadowColor: colors.black,
     shadowOffset: {
       width: 0,
       height: 8,
     },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 5,
   },
@@ -401,6 +389,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 15,
     textAlign: 'center',
+    color: colors.textPrimary,
   },
 
   tableRow: {
@@ -409,7 +398,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingVertical: 6,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: colors.surfaceBorder,
   },
 
   tableHeader: {
@@ -417,12 +406,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     paddingRight: 10,
+    color: colors.textPrimary,
   },
 
   tableValue: {
     flex: 0.8,
     fontSize: 16,
     textAlign: 'right',
+    color: colors.textPrimary,
   },
 
   dataHeader: {
@@ -435,10 +426,12 @@ const styles = StyleSheet.create({
   expandButton: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: colors.textPrimary,
   },
 
+  // Keep white background for QR info section for contrast with QR
   qrInfoSection: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.white,
     padding: 15,
     borderRadius: 10,
     marginBottom: 15,
@@ -451,7 +444,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 10,
     textAlign: 'center',
-    color: '#000000',
+    color: colors.black,
   },
 
   qrInfoText: {
@@ -459,6 +452,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginBottom: 5,
     textAlign: 'center',
+    color: colors.black,
   },
 });
 

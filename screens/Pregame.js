@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import {
+  Dimensions,
   Image,
   Keyboard,
   Modal,
@@ -14,14 +15,25 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
-import * as FileSystem from "expo-file-system";
-import Checkbox from "expo-checkbox";
+import * as FileSystem from "expo-file-system/legacy";
+import { colors } from "../components/colors";
 
 const PregameScreen = (props) => {
   const { navigation, route } = props;
 
   const [matchNum, setMatchNum] = useState();
   const [teamNum, setTeamNum] = useState();
+  const [isTablet, setIsTablet] = useState(false);
+
+  useEffect(() => {
+    const updateLayout = () => {
+      const dim = Dimensions.get('screen');
+      setIsTablet(Math.min(dim.width, dim.height) >= 600);
+    };
+    updateLayout();
+    const subscription = Dimensions.addEventListener('change', updateLayout);
+    return () => subscription.remove();
+  }, []);
 
   const [scoutName, setScoutName] = useState();
   const [driverStation, setDriverStation] = useState();
@@ -37,8 +49,6 @@ const PregameScreen = (props) => {
 
   const [maxMatchNum, setMaxMatchNum] = useState(0);
   const [minMatchNum, setMinMatchNum] = useState(1);
-
-  const [hpAtProcessor, setHpAtProcessor] = useState(false);
 
   const scheduleFileUri = `${
     FileSystem.documentDirectory
@@ -159,8 +169,15 @@ const PregameScreen = (props) => {
   const getAllianceColor = (driverStation) => {
     if (!driverStation) return null;
     return driverStation.charAt(0) === "R"
-      ? "rgba(255, 0, 0, 0.1)"
-      : "rgba(0, 0, 255, 0.1)";
+      ? colors.redAlliance
+      : colors.blueAlliance;
+  };
+
+  const getAllianceTextColor = (driverStation) => {
+    if (!driverStation) return colors.textPrimary;
+    return driverStation.charAt(0) === "R"
+      ? colors.redAllianceText
+      : colors.blueAllianceText;
   };
 
   const openNameModal = () => {
@@ -193,9 +210,8 @@ const PregameScreen = (props) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={{ flex: 1 }}>
-          {/* Header */}
+      <View style={{ flex: 1 }}>
+        {/* Header */}
           <View style={styles.headerContainer}>
             <View style={styles.header}>
               <TouchableOpacity
@@ -220,17 +236,18 @@ const PregameScreen = (props) => {
           </View>
 
           <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollViewContent}
+            style={[styles.scrollView, isTablet && styles.scrollViewTablet]}
+            contentContainerStyle={[styles.scrollViewContent, isTablet && styles.scrollViewContentTablet]}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
           >
             {/* Match Info Row */}
-            <View style={styles.rowContainer}>
+            <View style={[styles.rowContainer, isTablet && styles.rowContainerTablet]}>
               {/* Match Number Section */}
-              <View style={[styles.section, styles.halfSection]}>
-                <Text style={styles.sectionTitle}>Match Number</Text>
+              <View style={[styles.section, isTablet && styles.sectionTablet, styles.halfSection, isTablet && styles.halfSectionTablet]}>
+                <Text style={[styles.sectionTitle, isTablet && styles.sectionTitleTablet]}>Match Number</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, isTablet && styles.inputTablet]}
                   onChangeText={(text) => {
                     const num = parseInt(text);
                     if (!text) {
@@ -250,21 +267,21 @@ const PregameScreen = (props) => {
                 {/* Find Match Button */}
                 {!isPracticeMode && (
                   <TouchableOpacity
-                    style={styles.button}
+                    style={[styles.button, isTablet && styles.buttonTablet]}
                     onPress={async () => await findMatch()}
                   >
-                    <Text style={styles.smallerButtonText}>Find Match</Text>
+                    <Text style={[styles.smallerButtonText, isTablet && styles.smallerButtonTextTablet]}>Find Match</Text>
                   </TouchableOpacity>
                 )}
               </View>
 
               {/* Team Display Section */}
-              <View style={[styles.section, styles.halfSection]}>
-                <Text style={styles.sectionTitle}>Team Number</Text>
+              <View style={[styles.section, isTablet && styles.sectionTablet, styles.halfSection, isTablet && styles.halfSectionTablet]}>
+                <Text style={[styles.sectionTitle, isTablet && styles.sectionTitleTablet]}>Team Number</Text>
                 {/* Text input in practice mode, normal text otherwise */}
                 {isPracticeMode ? (
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, isTablet && styles.inputTablet]}
                     onChangeText={(text) => {
                       const num = parseInt(text);
                       if (!text) {
@@ -291,12 +308,7 @@ const PregameScreen = (props) => {
                       <Text
                         style={[
                           styles.teamNumber,
-                          {
-                            color:
-                              driverStation?.charAt(0) === "R"
-                                ? "#cc0000"
-                                : "#0000cc",
-                          },
+                          { color: getAllianceTextColor(driverStation) },
                         ]}
                       >
                         {teamNum}
@@ -317,15 +329,15 @@ const PregameScreen = (props) => {
             </View>
 
             {/* Scout Info Section */}
-            <View style={[styles.section, { marginBottom: 24 }]}>
-              <Text style={styles.sectionTitle}>Scout Information</Text>
+            <View style={[styles.section, isTablet && styles.sectionTablet, { marginBottom: isTablet ? 24 : 12 }]}>
+              <Text style={[styles.sectionTitle, isTablet && styles.sectionTitleTablet]}>Scout Information</Text>
 
               {/* Scout Name Button */}
               <TouchableOpacity
-                style={styles.scoutNameButton}
+                style={[styles.scoutNameButton, isTablet && styles.scoutNameButtonTablet]}
                 onPress={openNameModal}
               >
-                <Text style={styles.biggerButtonText}>
+                <Text style={[styles.biggerButtonText, isTablet && styles.biggerButtonTextTablet]}>
                   {scoutName || "Set Scout Name..."}
                 </Text>
               </TouchableOpacity>
@@ -334,46 +346,20 @@ const PregameScreen = (props) => {
               <View
                 style={[
                   styles.stationDisplay,
-                  driverStation && {
-                    backgroundColor:
-                      driverStation?.charAt(0) === "R"
-                        ? "rgba(255, 0, 0, 0.1)"
-                        : "rgba(0, 0, 255, 0.1)",
-                  },
+                  isTablet && styles.stationDisplayTablet,
+                  driverStation && { backgroundColor: getAllianceColor(driverStation) },
                 ]}
               >
                 <Text
                   style={[
                     styles.biggerButtonText,
-                    driverStation && {
-                      color:
-                        driverStation?.charAt(0) === "R"
-                          ? "#cc0000"
-                          : "#0000cc",
-                    },
+                    isTablet && styles.biggerButtonTextTablet,
+                    { color: getAllianceTextColor(driverStation) },
                   ]}
                 >
                   {driverStation || "Driver Station Not Set"}
                 </Text>
               </View>
-            </View>
-
-            {/* Human Player Section */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Human Player</Text>
-              <TouchableOpacity
-                style={styles.checkboxContainer}
-                onPress={() => setHpAtProcessor(!hpAtProcessor)}
-                activeOpacity={0.7}
-              >
-                <Checkbox
-                  style={styles.checkbox}
-                  value={hpAtProcessor}
-                  onValueChange={setHpAtProcessor}
-                  color={hpAtProcessor ? "#000000" : undefined}
-                />
-                <Text style={styles.checkboxLabel}>HP at Processor</Text>
-              </TouchableOpacity>
             </View>
 
             {/* Scout Name Edit Modal */}
@@ -402,13 +388,13 @@ const PregameScreen = (props) => {
                           style={[styles.modalButton, styles.cancelButton]}
                           onPress={() => setIsNameModalVisible(false)}
                         >
-                          <Text style={styles.smallerButtonText}>Cancel</Text>
+                          <Text style={[styles.smallerButtonText, styles.cancelButtonText]}>Cancel</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={[styles.modalButton, styles.saveButton]}
                           onPress={saveNameAndClose}
                         >
-                          <Text style={styles.smallerButtonText}>Save</Text>
+                          <Text style={[styles.smallerButtonText, styles.saveButtonText]}>Save</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -421,6 +407,7 @@ const PregameScreen = (props) => {
             <TouchableOpacity
               style={[
                 styles.button,
+                isTablet && styles.buttonTablet,
                 styles.submitButton,
                 (!matchNum || !teamNum) && styles.submitButtonDisabled,
               ]}
@@ -434,7 +421,6 @@ const PregameScreen = (props) => {
                   navigation.navigate("Match", {
                     matchNum: matchNum,
                     teamNum: teamNum,
-                    hpAtProcessor: hpAtProcessor,
                   });
                 } catch (error) {
                   console.error("Error in submitPrematch:", error);
@@ -444,7 +430,7 @@ const PregameScreen = (props) => {
                 }
               }}
             >
-              <Text style={styles.smallerButtonText}>Start Match</Text>
+              <Text style={[styles.smallerButtonText, isTablet && styles.smallerButtonTextTablet]}>Start Match</Text>
             </TouchableOpacity>
           </ScrollView>
 
@@ -467,19 +453,20 @@ const PregameScreen = (props) => {
                       onChangeText={setCommentValue}
                       placeholder="Enter pre-game comments..."
                       placeholderTextColor="rgba(255, 215, 0, 0.5)"
+                      autoFocus={true}
                     />
                     <View style={styles.modalButtons}>
                       <TouchableOpacity
                         style={[styles.modalButton, styles.cancelButton]}
                         onPress={() => setIsCommentModalVisible(false)}
                       >
-                        <Text style={styles.smallerButtonText}>Close</Text>
+                        <Text style={[styles.smallerButtonText, styles.cancelButtonText]}>Close</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.modalButton, styles.saveButton]}
                         onPress={() => setIsCommentModalVisible(false)}
                       >
-                        <Text style={styles.smallerButtonText}>Save</Text>
+                        <Text style={[styles.smallerButtonText, styles.saveButtonText]}>Save</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -488,7 +475,6 @@ const PregameScreen = (props) => {
             </TouchableWithoutFeedback>
           </Modal>
         </View>
-      </TouchableWithoutFeedback>
     </SafeAreaView>
   );
 
@@ -586,9 +572,7 @@ const PregameScreen = (props) => {
 
     let tmaKey = `${team}-${allianceKey}`;
 
-    let csvText = `${team},${match},${tmaKey},${position},${alliance},${scout},${
-      hpAtProcessor ? 1 : 0
-    },${commentValue === `` ? `""` : `"${commentValue}"`}`;
+    let csvText = `${team},${match},${tmaKey},${position},${alliance},${scout},${commentValue === `` ? `""` : `"${commentValue}"`}`;
 
     let csvURI = `${FileSystem.documentDirectory}match${match}.csv`;
     await FileSystem.writeAsStringAsync(csvURI, csvText);
@@ -600,12 +584,12 @@ const PregameScreen = (props) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff00d",
+    backgroundColor: colors.background,
   },
 
   headerContainer: {
     borderBottomWidth: 2,
-    borderBottomColor: "#000000",
+    borderBottomColor: colors.black,
     height: Platform.OS === "android" ? StatusBar.currentHeight + 70 : 80,
   },
 
@@ -621,11 +605,20 @@ const styles = StyleSheet.create({
   },
 
   scrollView: {
+    paddingHorizontal: 10,
+    paddingTop: 12,
+  },
+
+  scrollViewTablet: {
     paddingHorizontal: 20,
     paddingTop: 20,
   },
 
   scrollViewContent: {
+    paddingBottom: 12,
+  },
+
+  scrollViewContentTablet: {
     paddingBottom: 20,
   },
 
@@ -633,18 +626,18 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 28,
     fontFamily: "Cooper-Black",
-    color: "#000000",
+    color: colors.black,
     textAlign: "center",
   },
 
   backButton: {
-    backgroundColor: "#000000",
+    backgroundColor: colors.black,
     width: 48,
     height: 48,
     borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
+    shadowColor: colors.black,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -656,7 +649,7 @@ const styles = StyleSheet.create({
 
   backButtonText: {
     fontSize: 27,
-    color: "#FFD700",
+    color: colors.primary,
     fontWeight: "900",
     textAlign: "center",
     textAlignVertical: "center",
@@ -665,67 +658,99 @@ const styles = StyleSheet.create({
 
   section: {
     marginBottom: 4,
-    backgroundColor: "#ffffff",
-    borderRadius: 20,
-    padding: 24,
-    shadowColor: "#000000",
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 12,
+    shadowColor: colors.black,
     shadowOffset: {
       width: 0,
       height: 8,
     },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 5,
   },
 
+  sectionTablet: {
+    borderRadius: 20,
+    padding: 24,
+  },
+
   sectionTitle: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: "bold",
-    color: "#000000",
+    color: colors.textPrimary,
+    marginBottom: 8,
+  },
+
+  sectionTitleTablet: {
+    fontSize: 24,
     marginBottom: 16,
   },
 
   input: {
-    backgroundColor: "#1a1a1a",
-    color: "#FFD700",
+    backgroundColor: colors.surfaceLight,
+    color: colors.textPrimary,
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 14,
+    marginBottom: 10,
+    textAlign: "center",
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+  },
+
+  inputTablet: {
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
     marginBottom: 16,
-    textAlign: "center",
   },
 
   button: {
-    backgroundColor: "#000000",
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: colors.buttonPrimary,
+    padding: 12,
+    borderRadius: 10,
     alignItems: "center",
-    shadowColor: "#000",
+    shadowColor: colors.black,
     shadowOffset: {
       width: 0,
       height: 4,
     },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 3,
   },
 
+  buttonTablet: {
+    padding: 16,
+    borderRadius: 12,
+  },
+
   smallerButtonText: {
-    color: "#FFD700",
-    fontSize: 16,
+    color: colors.textOnPrimary,
+    fontSize: 14,
     fontWeight: "bold",
   },
 
+  smallerButtonTextTablet: {
+    fontSize: 16,
+  },
+
   biggerButtonText: {
-    color: "#FFD700",
-    fontSize: 18,
+    color: colors.textPrimary,
+    fontSize: 16,
     fontWeight: "bold",
     textAlign: "center",
   },
 
+  biggerButtonTextTablet: {
+    fontSize: 18,
+  },
+
   label: {
     fontSize: 16,
-    color: "#666666",
+    color: colors.textSecondary,
     textAlign: "center",
     marginBottom: 8,
   },
@@ -734,6 +759,7 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: "bold",
     textAlign: "center",
+    color: colors.textPrimary,
   },
 
   submitButton: {
@@ -741,11 +767,19 @@ const styles = StyleSheet.create({
   },
 
   submitButtonDisabled: {
-    backgroundColor: "#666666",
+    backgroundColor: colors.buttonDisabled,
   },
 
   scoutNameButton: {
-    backgroundColor: "#1a1a1a",
+    backgroundColor: colors.surfaceLight,
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+  },
+
+  scoutNameButtonTablet: {
     padding: 16,
     borderRadius: 12,
     marginBottom: 16,
@@ -765,31 +799,35 @@ const styles = StyleSheet.create({
   },
 
   modalContent: {
-    backgroundColor: "#ffffff",
+    backgroundColor: colors.surface,
     borderRadius: 20,
     padding: 24,
     width: "90%",
     maxWidth: 400,
     maxHeight: "80%",
+    borderWidth: 2,
+    borderColor: colors.primary,
   },
 
   modalTitle: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#000000",
+    color: colors.textPrimary,
     marginBottom: 16,
     textAlign: "center",
   },
 
   modalInput: {
-    backgroundColor: "#1a1a1a",
-    color: "#FFD700",
+    backgroundColor: colors.surfaceLight,
+    color: colors.textPrimary,
     borderRadius: 12,
     padding: 16,
     height: 300,
     fontSize: 16,
     textAlignVertical: "top",
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
   },
 
   modalButtons: {
@@ -805,28 +843,52 @@ const styles = StyleSheet.create({
   },
 
   cancelButton: {
-    backgroundColor: "#666666",
+    backgroundColor: colors.buttonSecondary,
+  },
+
+  cancelButtonText: {
+    color: colors.textPrimary,
   },
 
   saveButton: {
-    backgroundColor: "#000000",
+    backgroundColor: colors.buttonPrimary,
+  },
+
+  saveButtonText: {
+    color: colors.textOnPrimary,
   },
 
   stationDisplay: {
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceLight,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+  },
+
+  stationDisplayTablet: {
     padding: 16,
     borderRadius: 12,
-    backgroundColor: "rgba(0, 0, 0, 0.05)",
   },
 
   rowContainer: {
+    flexDirection: "column",
+    marginBottom: 0,
+  },
+
+  rowContainerTablet: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 24,
   },
 
   halfSection: {
-    flex: 0.48, // Slightly less than half to account for spacing
-    marginBottom: 0, // Remove bottom margin since it's handled by rowContainer
+    marginBottom: 12,
+  },
+
+  halfSectionTablet: {
+    flex: 0.48,
+    marginBottom: 0,
   },
 
   teamContainer: {
@@ -836,10 +898,11 @@ const styles = StyleSheet.create({
     minHeight: 100,
     borderRadius: 12,
     padding: 10,
+    backgroundColor: colors.surfaceLight,
   },
 
   commentButton: {
-    backgroundColor: "#000000",
+    backgroundColor: colors.black,
     width: 48,
     height: 48,
     borderRadius: 24,
@@ -850,51 +913,29 @@ const styles = StyleSheet.create({
   commentIcon: {
     width: 30,
     height: 30,
-    tintColor: "#FFD700",
+    tintColor: colors.primary,
   },
 
   nameModalInput: {
-    backgroundColor: "#1a1a1a",
-    color: "#FFD700",
+    backgroundColor: colors.surfaceLight,
+    color: colors.textPrimary,
     borderRadius: 12,
     padding: 16,
     height: 50,
     fontSize: 16,
     textAlignVertical: "center",
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
   },
 
   matchRangeText: {
     fontSize: 14,
-    color: "#666666",
+    color: colors.textSecondary,
     textAlign: "center",
     marginTop: 8,
   },
 
-  checkboxContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 20,
-    marginBottom: 10,
-    paddingVertical: 15,
-    paddingHorizontal: 5,
-    backgroundColor: "rgba(0, 0, 0, 0.05)",
-    borderRadius: 12,
-  },
-
-  checkbox: {
-    margin: 8,
-    width: 36,
-    height: 36,
-    borderRadius: 6,
-  },
-
-  checkboxLabel: {
-    fontSize: 20,
-    marginLeft: 12,
-    fontWeight: "500",
-  },
-});
+  });
 
 export default PregameScreen;
