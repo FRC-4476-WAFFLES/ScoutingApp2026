@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,7 +8,8 @@ import {
   TouchableOpacity,
   Image,
   Platform,
-  StatusBar
+  StatusBar,
+  Dimensions
 } from "react-native";
 import QRCode from "react-qr-code";
 import * as MediaLibrary from 'expo-media-library';
@@ -25,10 +26,22 @@ const QRCodeScreen = props => {
   const { navigation, route } = props;
   const csvData = route.params.data;
   const [isDataExpanded, setIsDataExpanded] = useState(false);
+  const [isTablet, setIsTablet] = useState(false);
 
   const ref = React.useRef(null);
 
-  React.useEffect(() => {
+  // Detect phone vs tablet
+  useEffect(() => {
+    const updateLayout = () => {
+      const { width, height } = Dimensions.get('window');
+      setIsTablet(Math.min(width, height) >= 600);
+    };
+    updateLayout();
+    const subscription = Dimensions.addEventListener('change', updateLayout);
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
     const getPermissions = async () => {
       const permission = await MediaLibrary.requestPermissionsAsync()
       if (!permission) {
@@ -118,9 +131,9 @@ const QRCodeScreen = props => {
             )}
           </View>
           <View style={styles.qrCodeWrapper}>
-            <QRCode 
+            <QRCode
               value={csvData || ' '}
-              size={400}
+              size={isTablet ? 400 : 250}
               style={styles.qrCode}
             />
           </View>

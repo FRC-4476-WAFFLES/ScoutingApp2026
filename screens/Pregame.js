@@ -105,12 +105,15 @@ const PregameScreen = (props) => {
   }, []);
 
   // Reload comment from file whenever screen gains focus (handles edits from Match screen)
+  // Uses route.params.matchNum directly to avoid timing issues with state updates
   useFocusEffect(
     useCallback(() => {
+      const currentMatchNum = route.params?.matchNum;
+
       const loadExistingComment = async () => {
-        if (matchNum) {
+        if (currentMatchNum) {
           try {
-            const csvURI = `${FileSystem.documentDirectory}match${matchNum}.csv`;
+            const csvURI = `${FileSystem.documentDirectory}match${currentMatchNum}.csv`;
             const exists = await FileSystem.getInfoAsync(csvURI);
 
             if (exists.exists) {
@@ -123,21 +126,20 @@ const PregameScreen = (props) => {
               } else {
                 setCommentValue("");
               }
+            } else {
+              // New match - clear comment
+              setCommentValue("");
             }
           } catch (error) {
             console.error("Error loading existing comment:", error);
+            setCommentValue("");
           }
         }
       };
 
       loadExistingComment();
-    }, [matchNum])
+    }, [route.params?.matchNum])
   );
-
-  // Clear comments when match number changes
-  useEffect(() => {
-    setCommentValue("");
-  }, [matchNum]);
 
   // Return red or blue depending on the alliance
   const getAllianceColor = (driverStation) => {
