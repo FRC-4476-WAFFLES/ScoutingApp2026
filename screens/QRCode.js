@@ -15,6 +15,7 @@ import * as MediaLibrary from 'expo-media-library';
 import ViewShot from "react-native-view-shot";
 import { captureRef } from 'react-native-view-shot';
 import { colors } from "../components/colors";
+import { parseCSV } from "../utils/csv";
 
 const CSV_HEADERS = "Team Number,Match Number,TMA Key,Driver Station,Alliance,Scout Name,Pre-Game Comment,Auto Fuel Scored,TeleOp Fuel Scored,Match Comments,Questions/Clarifications";
 
@@ -40,7 +41,7 @@ const QRCodeScreen = props => {
 
   function getFormattedDataTable(csvData) {
     if (!csvData) return null;
-    const values = CSVtoArray(csvData);
+    const values = parseCSV(csvData);
     if (!values) return null;
 
     // Headers in exact order matching the CSV data structure
@@ -75,7 +76,7 @@ const QRCodeScreen = props => {
 
   function getQRInfo(csvData) {
     if (!csvData) return null;
-    const values = CSVtoArray(csvData);
+    const values = parseCSV(csvData);
     if (!values) return null;
     
     return {
@@ -186,28 +187,12 @@ const QRCodeScreen = props => {
 
   function getDataFormatted(data) {
     if (!data) return '';
-    let arr = CSVtoArray(data);
+    let arr = parseCSV(data);
     if (!arr) return '';
     let match = arr[1];
     return match ? `Match: ${match}` : '';
   }
 
-  // Return array of string values, or NULL if CSV string not well formed.
-  function CSVtoArray(text) {
-    var re_valid = /^\s*(?:'[^'\\]*(?:\\[\S\s][^'\\]*)*'|"[^"\\]*(?:\\[\S\s][^"\\]*)*"|[^,'"\s\\]*(?:\s+[^,'"\s\\]+)*)\s*(?:,\s*(?:'[^'\\]*(?:\\[\S\s][^'\\]*)*'|"[^"\\]*(?:\\[\S\s][^"\\]*)*"|[^,'"\s\\]*(?:\s+[^,'"\s\\]+)*)\s*)*$/;
-    var re_value = /(?!\s*$)\s*(?:'([^'\\]*(?:\\[\S\s][^'\\]*)*)'|"([^"\\]*(?:\\[\S\s][^"\\]*)*)"|([^,'"\s\\]*(?:\s+[^,'"\s\\]+)*))\s*(?:,|$)/g;
-    if (!re_valid.test(text)) return null;
-    var a = [];
-    text.replace(re_value,
-      function(m0, m1, m2, m3) {
-        if (m1 !== undefined) a.push(m1.replace(/\\'/g, "'"));
-        else if (m2 !== undefined) a.push(m2.replace(/\\"/g, '"'));
-        else if (m3 !== undefined) a.push(m3);
-        return '';
-      });
-    if (/,\s*$/.test(text)) a.push('');
-    return a;
-  }
 }
 
 const styles = StyleSheet.create({

@@ -22,6 +22,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from "../components/colors";
+import { parseCSV, escapeCSVField } from "../utils/csv";
 
 const getAllianceColor = (driverStation) => {
   if (!driverStation) return null;
@@ -90,8 +91,13 @@ const MatchScreen = props => {
           const data = await FileSystem.readAsStringAsync(csvURI);
           console.log("Raw data loaded:", data);
 
-          const values = data.split(',').map(val => val.replace(/^"|"$/g, ''));
-          console.log("Split values:", values);
+          const values = parseCSV(data);
+          console.log("Parsed values:", values);
+
+          if (!values) {
+            console.error("Failed to parse CSV data");
+            return;
+          }
 
           // Load fuel scores (indices 7 and 8)
           if (values.length >= 9) {
@@ -192,17 +198,26 @@ const MatchScreen = props => {
       const csvURI = `${FileSystem.documentDirectory}match${match}.csv`;
       let currData = await FileSystem.readAsStringAsync(csvURI);
 
-      // Split and get team info (first 7 fields)
-      const values = currData.split(',');
-      const teamInfo = values.slice(0, 7).join(',');
+      // Parse existing data properly (handles quoted fields with commas)
+      const values = parseCSV(currData);
+      if (!values || values.length < 7) {
+        console.error("Failed to parse existing CSV data");
+        return null;
+      }
 
-      // Build the new data string
+      // Rebuild with first 7 fields preserved, then add match data
       const newData = [
-        teamInfo,
+        values[0], // Team
+        values[1], // Match
+        values[2], // TMA Key
+        values[3], // Position
+        values[4], // Alliance
+        values[5], // Scout
+        escapeCSVField(values[6]), // Pre-game comment
         autoFuelScored,
         teleOpFuelScored,
-        `"${commentValue || ''}"`,
-        `"${questionValue || ''}"`,
+        escapeCSVField(commentValue || ''),
+        escapeCSVField(questionValue || ''),
       ].join(',');
 
       await FileSystem.writeAsStringAsync(csvURI, newData);

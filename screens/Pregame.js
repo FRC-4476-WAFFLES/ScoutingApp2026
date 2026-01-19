@@ -17,6 +17,7 @@ import {
 } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
 import { colors } from "../components/colors";
+import { parseCSV, escapeCSVField } from "../utils/csv";
 
 const PregameScreen = (props) => {
   const { navigation, route } = props;
@@ -136,11 +137,12 @@ const PregameScreen = (props) => {
 
           if (exists.exists) {
             const data = await FileSystem.readAsStringAsync(csvURI);
-            const values = data.split(",");
-            const existingComment = values[values.length - 1];
+            const values = parseCSV(data);
 
-            if (existingComment && existingComment !== `""`) {
-              setCommentValue(existingComment.replace(/^"|"$/g, ""));
+            if (values && values.length > 6) {
+              // Pre-game comment is at index 6
+              const existingComment = values[6];
+              setCommentValue(existingComment || "");
             } else {
               setCommentValue("");
             }
@@ -575,7 +577,7 @@ const PregameScreen = (props) => {
 
     let tmaKey = `${team}-${allianceKey}`;
 
-    let csvText = `${team},${match},${tmaKey},${position},${alliance},${scout},${commentValue === `` ? `""` : `"${commentValue}"`}`;
+    let csvText = `${team},${match},${tmaKey},${position},${alliance},${scout},${escapeCSVField(commentValue)}`;
 
     let csvURI = `${FileSystem.documentDirectory}match${match}.csv`;
     await FileSystem.writeAsStringAsync(csvURI, csvText);

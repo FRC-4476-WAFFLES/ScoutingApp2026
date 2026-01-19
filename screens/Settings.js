@@ -14,6 +14,7 @@ import {
   View,
 } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
+import Constants from "expo-constants";
 import { colors } from "../components/colors";
 
 const SettingsScreen = (props) => {
@@ -160,8 +161,14 @@ const SettingsScreen = (props) => {
       const eventCode = codeText.substring(4);
 
       var base64 = require("base-64");
-      var username = "faiazumaer";
-      var password = "5fecfbc3-09ce-45a0-bad2-769fd4006781";
+      var username = Constants.expoConfig?.extra?.firstApiUsername;
+      var password = Constants.expoConfig?.extra?.firstApiPassword;
+
+      if (!username || !password) {
+        throw new Error(
+          "FIRST API credentials not configured. Please set FIRST_API_USERNAME and FIRST_API_PASSWORD in .env"
+        );
+      }
 
       var requestOptions = {
         method: "GET",
