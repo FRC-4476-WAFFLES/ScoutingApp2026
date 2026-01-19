@@ -23,6 +23,7 @@ import * as Haptics from 'expo-haptics';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from "../components/colors";
 import { parseCSV, escapeCSVField } from "../utils/csv";
+import { useSettings } from "../contexts/SettingsContext";
 
 const getAllianceColor = (driverStation) => {
   if (!driverStation) return null;
@@ -47,7 +48,9 @@ const MatchScreen = props => {
   const [isQuestionModalVisible, setIsQuestionModalVisible] = useState(false);
   const [questionValue, setQuestionValue] = useState('');
 
-  const [driverStation, setDriverStation] = useState(null);
+  // Get settings from context
+  const { driverStation } = useSettings();
+
   const [isTablet, setIsTablet] = useState(false);
 
   // Recent change tracking
@@ -99,6 +102,11 @@ const MatchScreen = props => {
             return;
           }
 
+          // Load comment from index 6 (shared with Pregame)
+          if (values.length > 6) {
+            setCommentValue(values[6] || '');
+          }
+
           // Load fuel scores (indices 7 and 8)
           if (values.length >= 9) {
             const auto = parseInt(values[7]);
@@ -107,12 +115,9 @@ const MatchScreen = props => {
             if (!isNaN(auto)) setAutoFuelScored(auto);
             if (!isNaN(teleOp)) setTeleOpFuelScored(teleOp);
 
-            // Comments & Questions (indices 9-10)
+            // Questions at index 9
             if (values.length > 9) {
-              setCommentValue(values[9] || '');
-            }
-            if (values.length > 10) {
-              setQuestionValue(values[10] || '');
+              setQuestionValue(values[9] || '');
             }
 
             console.log("Successfully loaded match data");
@@ -126,21 +131,6 @@ const MatchScreen = props => {
     loadExistingMatchData();
   }, [route.params?.matchNum]);
 
-  useEffect(() => {
-    const loadDriverStation = async () => {
-      try {
-        const settingsFileUri = `${FileSystem.documentDirectory}ScoutingAppSettings.json`;
-        let settingsJSON = await JSON.parse(
-          await FileSystem.readAsStringAsync(settingsFileUri)
-        );
-        setDriverStation(settingsJSON["Settings"]["driverStation"]);
-      } catch (err) {
-        console.log("Error loading driver station:", err);
-      }
-    };
-
-    loadDriverStation();
-  }, []);
 
   const updateAutoFuel = (amount) => {
     const newValue = autoFuelScored + amount;
@@ -205,7 +195,7 @@ const MatchScreen = props => {
         return null;
       }
 
-      // Rebuild with first 7 fields preserved, then add match data
+      // Rebuild CSV with shared comment field at index 6
       const newData = [
         values[0], // Team
         values[1], // Match
@@ -213,10 +203,9 @@ const MatchScreen = props => {
         values[3], // Position
         values[4], // Alliance
         values[5], // Scout
-        escapeCSVField(values[6]), // Pre-game comment
+        escapeCSVField(commentValue || ''), // Shared comment (editable in both Pregame and Match)
         autoFuelScored,
         teleOpFuelScored,
-        escapeCSVField(commentValue || ''),
         escapeCSVField(questionValue || ''),
       ].join(',');
 
@@ -915,8 +904,9 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     zIndex: 1000,
   },
 

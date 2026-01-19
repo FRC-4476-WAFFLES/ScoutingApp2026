@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Dimensions,
   Image,
@@ -15,12 +15,17 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import * as FileSystem from "expo-file-system/legacy";
 import { colors } from "../components/colors";
 import { parseCSV, escapeCSVField } from "../utils/csv";
+import { useSettings } from "../contexts/SettingsContext";
 
 const PregameScreen = (props) => {
   const { navigation, route } = props;
+
+  // Get settings from context
+  const { scoutName, driverStation, isPracticeMode, updateScoutName } = useSettings();
 
   const [matchNum, setMatchNum] = useState();
   const [teamNum, setTeamNum] = useState();
@@ -36,10 +41,6 @@ const PregameScreen = (props) => {
     return () => subscription.remove();
   }, []);
 
-  const [scoutName, setScoutName] = useState();
-  const [driverStation, setDriverStation] = useState();
-  const [isPracticeMode, setIsPracticeMode] = useState(false);
-
   const [isNameModalVisible, setIsNameModalVisible] = useState(false);
   const [tempScoutName, setTempScoutName] = useState("");
 
@@ -51,15 +52,8 @@ const PregameScreen = (props) => {
   const [maxMatchNum, setMaxMatchNum] = useState(0);
   const [minMatchNum, setMinMatchNum] = useState(1);
 
-  const scheduleFileUri = `${
-    FileSystem.documentDirectory
-  }${"MatchSchedule.json"}`;
-  const scheduleCsvUri = `${
-    FileSystem.documentDirectory
-  }${"MatchScheduleCsv.json"}`;
-  const settingsFileUri = `${
-    FileSystem.documentDirectory
-  }${"ScoutingAppSettings.json"}`;
+  const scheduleFileUri = `${FileSystem.documentDirectory}MatchSchedule.json`;
+  const scheduleCsvUri = `${FileSystem.documentDirectory}MatchScheduleCsv.json`;
 
   const apiStations = {
     R1: "Red1",
@@ -83,23 +77,6 @@ const PregameScreen = (props) => {
     }
   }, [route.params]);
 
-  // Read from settings file and set scout info on mount
-  useEffect(() => {
-    const loadScoutInfo = async () => {
-      try {
-        let settingsJSON = await JSON.parse(
-          await FileSystem.readAsStringAsync(settingsFileUri)
-        );
-        setScoutName(settingsJSON["Settings"]["scoutName"]);
-        setDriverStation(settingsJSON["Settings"]["driverStation"]);
-        setIsPracticeMode(settingsJSON["Settings"]["isPracticeMode"]);
-      } catch (err) {
-        console.log("No Settings File Saved.");
-      }
-    };
-
-    loadScoutInfo();
-  }, []);
 
   // Determine the range of matches for the event on mount
   useEffect(() => {
@@ -127,44 +104,39 @@ const PregameScreen = (props) => {
     loadMatchRange();
   }, []);
 
-  // Load saved comments from filesystem when match number changes
-  useEffect(() => {
-    const loadExistingComment = async () => {
-      if (!isInitialized && matchNum) {
-        try {
-          const csvURI = `${FileSystem.documentDirectory}match${matchNum}.csv`;
-          const exists = await FileSystem.getInfoAsync(csvURI);
+  // Reload comment from file whenever screen gains focus (handles edits from Match screen)
+  useFocusEffect(
+    useCallback(() => {
+      const loadExistingComment = async () => {
+        if (matchNum) {
+          try {
+            const csvURI = `${FileSystem.documentDirectory}match${matchNum}.csv`;
+            const exists = await FileSystem.getInfoAsync(csvURI);
 
-          if (exists.exists) {
-            const data = await FileSystem.readAsStringAsync(csvURI);
-            const values = parseCSV(data);
+            if (exists.exists) {
+              const data = await FileSystem.readAsStringAsync(csvURI);
+              const values = parseCSV(data);
 
-            if (values && values.length > 6) {
-              // Pre-game comment is at index 6
-              const existingComment = values[6];
-              setCommentValue(existingComment || "");
-            } else {
-              setCommentValue("");
+              if (values && values.length > 6) {
+                const existingComment = values[6];
+                setCommentValue(existingComment || "");
+              } else {
+                setCommentValue("");
+              }
             }
-          } else {
-            setCommentValue("");
+          } catch (error) {
+            console.error("Error loading existing comment:", error);
           }
-
-          setIsInitialized(true);
-        } catch (error) {
-          console.error("Error loading existing comment:", error);
-          setCommentValue("");
         }
-      }
-    };
+      };
 
-    loadExistingComment();
-  }, [matchNum, isInitialized]);
+      loadExistingComment();
+    }, [matchNum])
+  );
 
   // Clear comments when match number changes
   useEffect(() => {
     setCommentValue("");
-    setIsInitialized(false);
   }, [matchNum]);
 
   // Return red or blue depending on the alliance
@@ -190,24 +162,6 @@ const PregameScreen = (props) => {
   const saveNameAndClose = async () => {
     await updateScoutName(tempScoutName);
     setIsNameModalVisible(false);
-  };
-
-  // Save scout name to settings file
-  const updateScoutName = async (newName) => {
-    try {
-      let settingsJSON = await JSON.parse(
-        await FileSystem.readAsStringAsync(settingsFileUri)
-      );
-      settingsJSON["Settings"]["scoutName"] = newName;
-      await FileSystem.writeAsStringAsync(
-        settingsFileUri,
-        JSON.stringify(settingsJSON, null, 2)
-      );
-      setScoutName(newName);
-    } catch (err) {
-      console.log("Error updating scout name:", err);
-      alert("Failed to save scout name. Please try again.");
-    }
   };
 
   return (
@@ -483,7 +437,7 @@ const PregameScreen = (props) => {
     </SafeAreaView>
   );
 
-  // Get the team nummber from the match schedule file based on the match number and driver statino
+  // Get the team number from the match schedule file based on the match number and driver station
   async function findMatch() {
     if (!matchNum) {
       alert("Please enter a match number");
@@ -498,11 +452,7 @@ const PregameScreen = (props) => {
       return;
     }
 
-    let settingsJSON = await JSON.parse(
-      await FileSystem.readAsStringAsync(settingsFileUri)
-    );
-
-    let position = await settingsJSON["Settings"]["driverStation"];
+    const position = driverStation;
 
     let tmp = await FileSystem.getInfoAsync(scheduleCsvUri);
 
@@ -564,22 +514,18 @@ const PregameScreen = (props) => {
 
   // Save prematch settings to file
   async function submitPrematch() {
-    let settingsJSON = await JSON.parse(
-      await FileSystem.readAsStringAsync(settingsFileUri)
-    );
+    const team = teamNum;
+    const match = matchNum;
+    const position = driverStation;
+    const alliance = driverStation?.charAt(0);
+    const allianceKey = `${alliance}${match}`;
+    const scout = scoutName;
 
-    let team = teamNum;
-    let match = matchNum;
-    let position = await settingsJSON["Settings"]["driverStation"];
-    let alliance = await settingsJSON["Settings"]["driverStation"].charAt(0);
-    let allianceKey = `${await alliance}${match}`;
-    let scout = await settingsJSON["Settings"]["scoutName"];
+    const tmaKey = `${team}-${allianceKey}`;
 
-    let tmaKey = `${team}-${allianceKey}`;
+    const csvText = `${team},${match},${tmaKey},${position},${alliance},${scout},${escapeCSVField(commentValue)}`;
 
-    let csvText = `${team},${match},${tmaKey},${position},${alliance},${scout},${escapeCSVField(commentValue)}`;
-
-    let csvURI = `${FileSystem.documentDirectory}match${match}.csv`;
+    const csvURI = `${FileSystem.documentDirectory}match${match}.csv`;
     await FileSystem.writeAsStringAsync(csvURI, csvText);
     console.log(`CSV Text: ${await FileSystem.readAsStringAsync(csvURI)}`);
   }

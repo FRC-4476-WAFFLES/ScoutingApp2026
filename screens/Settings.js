@@ -16,97 +16,63 @@ import {
 import * as FileSystem from "expo-file-system/legacy";
 import Constants from "expo-constants";
 import { colors } from "../components/colors";
+import { useSettings } from "../contexts/SettingsContext";
 
 const SettingsScreen = (props) => {
   const { navigation } = props;
 
+  // Get settings from context
+  const settings = useSettings();
+
   const [codeText, setCodeText] = useState();
-  const [nameText, setNameText] = useState();
-  const [isPracticeMode, setIsPracticeMode] = useState(false);
-
   const [showScheduleCheckmark, setShowScheduleCheckmark] = useState(false);
-
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [initialValues, setInitialValues] = useState({
-    nameText: undefined,
-    driverstation: undefined,
-    isPracticeMode: false,
-  });
-
-  const scheduleFileUri = `${
-    FileSystem.documentDirectory
-  }${"MatchSchedule.json"}`;
-  const settingsFileUri = `${
-    FileSystem.documentDirectory
-  }${"ScoutingAppSettings.json"}`;
-
-  const [driverstation, setDriverstation] = useState();
   const [showPicker, setShowPicker] = useState(false);
-
   const [loadedEventCode, setLoadedEventCode] = useState(null);
 
-  // Set settings and match schedule on mount
+  // Local editing state (initialized from context)
+  const [nameText, setNameText] = useState();
+  const [driverstation, setDriverstation] = useState();
+  const [isPracticeMode, setIsPracticeMode] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  const scheduleFileUri = `${FileSystem.documentDirectory}MatchSchedule.json`;
+
+  // Initialize local state from context when settings are loaded
   useEffect(() => {
-    // Read from settings file and set initial settings variables
-    const setSettingsVars = async () => {
-      try {
-        let settingsJSON = await JSON.parse(
-          await FileSystem.readAsStringAsync(settingsFileUri)
-        );
-        const name = await settingsJSON["Settings"]["scoutName"];
-        const station = await settingsJSON["Settings"]["driverStation"];
-        const practiceMode = await settingsJSON["Settings"]["isPracticeMode"];
-        setNameText(name);
-        setDriverstation(station);
-        setIsPracticeMode(practiceMode);
-        setInitialValues({
-          nameText: name,
-          driverstation: station,
-          practiceMode: practiceMode,
-        });
-      } catch (err) {
-        console.log("No Settings File Saved.");
-      }
-    };
+    if (settings.isLoaded && !isInitialized) {
+      setNameText(settings.scoutName);
+      setDriverstation(settings.driverStation);
+      setIsPracticeMode(settings.isPracticeMode);
+      setIsInitialized(true);
+    }
+  }, [settings.isLoaded, isInitialized]);
 
-    // Read from match schedule file and set event code
+  // Check for match schedule file on mount
+  useEffect(() => {
     const checkMatchScheduleExists = async () => {
-      let tmp = await FileSystem.getInfoAsync(scheduleFileUri);
-      console.log(`Match Schedule Exists: ${tmp.exists}`);
-
-      if (tmp.exists) {
+      const fileInfo = await FileSystem.getInfoAsync(scheduleFileUri);
+      if (fileInfo.exists) {
         try {
-          const scheduleData = await FileSystem.readAsStringAsync(
-            scheduleFileUri
-          );
+          const scheduleData = await FileSystem.readAsStringAsync(scheduleFileUri);
           const parsedData = JSON.parse(scheduleData);
-          const eventCode =
-            parsedData.eventCode || parsedData.Schedule?.[0]?.eventCode;
+          const eventCode = parsedData.eventCode || parsedData.Schedule?.[0]?.eventCode;
           setLoadedEventCode(eventCode);
         } catch (err) {
           console.log("Error reading event code:", err);
         }
       }
     };
-
-    setSettingsVars();
     checkMatchScheduleExists();
   }, []);
 
-  // Save settings to file
-  async function saveSettings() {
-    let theJSON = `
-      {
-        "Settings": {
-          "scoutName": "${nameText}",
-          "driverStation": "${driverstation}",
-          "isPracticeMode": ${isPracticeMode}
-        }
-      }
-    `;
-
-    await FileSystem.writeAsStringAsync(settingsFileUri, theJSON);
-    console.log(await FileSystem.readAsStringAsync(settingsFileUri));
+  // Save settings to context (which persists to file)
+  async function handleSaveSettings() {
+    await settings.saveSettings({
+      scoutName: nameText,
+      driverStation: driverstation,
+      isPracticeMode: isPracticeMode,
+    });
   }
 
   // Save match schedule to file
@@ -200,9 +166,9 @@ const SettingsScreen = (props) => {
   const handleNameChange = (text) => {
     setNameText(text);
     setHasUnsavedChanges(
-      text !== initialValues.nameText ||
-        driverstation !== initialValues.driverstation ||
-        isPracticeMode !== initialValues.isPracticeMode
+      text !== settings.scoutName ||
+        driverstation !== settings.driverStation ||
+        isPracticeMode !== settings.isPracticeMode
     );
   };
 
@@ -211,9 +177,9 @@ const SettingsScreen = (props) => {
     setDriverstation(station);
     setShowPicker(false);
     setHasUnsavedChanges(
-      nameText !== initialValues.nameText ||
-        station !== initialValues.driverstation ||
-        isPracticeMode !== initialValues.isPracticeMode
+      nameText !== settings.scoutName ||
+        station !== settings.driverStation ||
+        isPracticeMode !== settings.isPracticeMode
     );
   };
 
@@ -221,9 +187,9 @@ const SettingsScreen = (props) => {
   const handlePracticeModeChange = (value) => {
     setIsPracticeMode((prev) => !prev);
     setHasUnsavedChanges(
-      nameText !== initialValues.nameText ||
-        driverstation !== initialValues.driverstation ||
-        value !== initialValues.isPracticeMode
+      nameText !== settings.scoutName ||
+        driverstation !== settings.driverStation ||
+        value !== settings.isPracticeMode
     );
   };
 
@@ -432,12 +398,8 @@ const SettingsScreen = (props) => {
         <TouchableOpacity
           style={[styles.button, styles.saveButton]}
           onPress={async () => {
-            await saveSettings();
+            await handleSaveSettings();
             setHasUnsavedChanges(false);
-            setInitialValues({
-              nameText,
-              driverstation,
-            });
             navigation.navigate("Home");
           }}
         >

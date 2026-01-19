@@ -17,7 +17,7 @@ import { captureRef } from 'react-native-view-shot';
 import { colors } from "../components/colors";
 import { parseCSV } from "../utils/csv";
 
-const CSV_HEADERS = "Team Number,Match Number,TMA Key,Driver Station,Alliance,Scout Name,Pre-Game Comment,Auto Fuel Scored,TeleOp Fuel Scored,Match Comments,Questions/Clarifications";
+const CSV_HEADERS = "Team Number,Match Number,TMA Key,Driver Station,Alliance,Scout Name,Comments,Auto Fuel Scored,TeleOp Fuel Scored,Questions/Clarifications";
 
 export const getCSVHeaders = () => CSV_HEADERS;
 
@@ -52,11 +52,10 @@ const QRCodeScreen = props => {
       { header: 'Driver Station', index: 3 },
       { header: 'Alliance', index: 4 },
       { header: 'Scout Name', index: 5 },
-      { header: 'Pre-Game Comment', index: 6 },
+      { header: 'Comments', index: 6 },
       { header: 'Auto Fuel Scored', index: 7 },
       { header: 'TeleOp Fuel Scored', index: 8 },
-      { header: 'Match Comments', index: 9 },
-      { header: 'Questions/Clarifications', index: 10 }
+      { header: 'Questions/Clarifications', index: 9 }
     ];
 
     return (
