@@ -18,7 +18,7 @@ import { captureRef } from 'react-native-view-shot';
 import { colors } from "../components/colors";
 import { parseCSV } from "../utils/csv";
 
-const CSV_HEADERS = "Team Number,Match Number,TMA Key,Driver Station,Alliance,Scout Name,Comments,Auto Fuel Scored,TeleOp Fuel Scored,Questions/Clarifications";
+const CSV_HEADERS = "Team Number,Match Number,TMA Key,Driver Station,Alliance,Scout Name,Comments,Auto Fuel Scored,Auto Passes,TeleOp Fuel Scored,TeleOp Passes,Questions/Clarifications";
 
 export const getCSVHeaders = () => CSV_HEADERS;
 
@@ -67,8 +67,10 @@ const QRCodeScreen = props => {
       { header: 'Scout Name', index: 5 },
       { header: 'Comments', index: 6 },
       { header: 'Auto Fuel Scored', index: 7 },
-      { header: 'TeleOp Fuel Scored', index: 8 },
-      { header: 'Questions/Clarifications', index: 9 }
+      { header: 'Auto Passes', index: 8 },
+      { header: 'TeleOp Fuel Scored', index: 9 },
+      { header: 'TeleOp Passes', index: 10 },
+      { header: 'Questions/Clarifications', index: 11 }
     ];
 
     return (
@@ -282,15 +284,15 @@ const styles = StyleSheet.create({
   qrcodeContainer: {
     backgroundColor: colors.white,
     padding: 25,
-    borderRadius: 20,
+    borderRadius: 8,
     marginVertical: 20,
     shadowColor: colors.black,
     shadowOffset: {
       width: 0,
-      height: 8,
+      height: 4,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
     elevation: 5,
     width: '100%',
     alignItems: 'center',
@@ -312,15 +314,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     width: '100%',
     padding: 20,
-    borderRadius: 20,
+    borderRadius: 8,
     marginBottom: 20,
     shadowColor: colors.black,
     shadowOffset: {
       width: 0,
-      height: 8,
+      height: 4,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
     elevation: 5,
   },
 
@@ -346,17 +348,17 @@ const styles = StyleSheet.create({
   actionButton: {
     backgroundColor: colors.buttonPrimary,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 8,
     width: '100%',
     alignItems: 'center',
     marginBottom: 16,
     shadowColor: colors.black,
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 2,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
     elevation: 3,
   },
 
@@ -369,15 +371,15 @@ const styles = StyleSheet.create({
   tableContainer: {
     backgroundColor: colors.surface,
     padding: 20,
-    borderRadius: 20,
+    borderRadius: 8,
     marginBottom: 20,
     shadowColor: colors.black,
     shadowOffset: {
       width: 0,
-      height: 8,
+      height: 4,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
     elevation: 5,
   },
 
@@ -430,7 +432,7 @@ const styles = StyleSheet.create({
   qrInfoSection: {
     backgroundColor: colors.white,
     padding: 15,
-    borderRadius: 10,
+    borderRadius: 8,
     marginBottom: 15,
     alignItems: 'center',
     width: '100%',

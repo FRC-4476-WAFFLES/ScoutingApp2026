@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(npx expo config:*)",
+      "Bash(npm test)",
+      "Bash(test:*)",
+      "Bash(git check-ignore:*)"
+    ]
+  }
+}

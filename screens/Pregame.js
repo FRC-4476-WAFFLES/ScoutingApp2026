@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Dimensions,
-  Image,
   Keyboard,
   Modal,
   Platform,
@@ -17,6 +16,7 @@ import {
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import * as FileSystem from "expo-file-system/legacy";
+import { MaterialIcons } from "@expo/vector-icons";
 import { colors } from "../components/colors";
 import { parseCSV, escapeCSVField } from "../utils/csv";
 import { useSettings } from "../contexts/SettingsContext";
@@ -185,10 +185,7 @@ const PregameScreen = (props) => {
                 style={styles.commentButton}
                 onPress={() => setIsCommentModalVisible(true)}
               >
-                <Image
-                  source={require("../assets/images/comment-icon.png")}
-                  style={styles.commentIcon}
-                />
+                <MaterialIcons name="chat-bubble" size={28} color={colors.primary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -612,20 +609,20 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 4,
     backgroundColor: colors.surface,
-    borderRadius: 16,
+    borderRadius: 8,
     padding: 12,
     shadowColor: colors.black,
     shadowOffset: {
       width: 0,
-      height: 8,
+      height: 4,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
     elevation: 5,
   },
 
   sectionTablet: {
-    borderRadius: 20,
+    borderRadius: 8,
     padding: 24,
   },
 
@@ -644,7 +641,7 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: colors.surfaceLight,
     color: colors.textPrimary,
-    borderRadius: 10,
+    borderRadius: 8,
     padding: 12,
     fontSize: 14,
     marginBottom: 10,
@@ -654,7 +651,7 @@ const styles = StyleSheet.create({
   },
 
   inputTablet: {
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 16,
     fontSize: 16,
     marginBottom: 16,
@@ -663,21 +660,21 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: colors.buttonPrimary,
     padding: 12,
-    borderRadius: 10,
+    borderRadius: 8,
     alignItems: "center",
     shadowColor: colors.black,
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 2,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
     elevation: 3,
   },
 
   buttonTablet: {
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 8,
   },
 
   smallerButtonText: {
@@ -726,7 +723,7 @@ const styles = StyleSheet.create({
   scoutNameButton: {
     backgroundColor: colors.surfaceLight,
     padding: 12,
-    borderRadius: 10,
+    borderRadius: 8,
     marginBottom: 10,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
@@ -734,7 +731,7 @@ const styles = StyleSheet.create({
 
   scoutNameButtonTablet: {
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 8,
     marginBottom: 16,
   },
 
@@ -753,7 +750,7 @@ const styles = StyleSheet.create({
 
   modalContent: {
     backgroundColor: colors.surface,
-    borderRadius: 20,
+    borderRadius: 8,
     padding: 24,
     width: "90%",
     maxWidth: 400,
@@ -773,7 +770,7 @@ const styles = StyleSheet.create({
   modalInput: {
     backgroundColor: colors.surfaceLight,
     color: colors.textPrimary,
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 16,
     height: 300,
     fontSize: 16,
@@ -791,7 +788,7 @@ const styles = StyleSheet.create({
   modalButton: {
     flex: 0.48,
     padding: 12,
-    borderRadius: 12,
+    borderRadius: 8,
     alignItems: "center",
   },
 
@@ -813,7 +810,7 @@ const styles = StyleSheet.create({
 
   stationDisplay: {
     padding: 12,
-    borderRadius: 10,
+    borderRadius: 8,
     backgroundColor: colors.surfaceLight,
     borderWidth: 1,
     borderColor: colors.surfaceBorder,
@@ -821,7 +818,7 @@ const styles = StyleSheet.create({
 
   stationDisplayTablet: {
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 8,
   },
 
   rowContainer: {
@@ -849,7 +846,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     minHeight: 100,
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 10,
     backgroundColor: colors.surfaceLight,
   },
@@ -863,16 +860,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  commentIcon: {
-    width: 30,
-    height: 30,
-    tintColor: colors.primary,
-  },
-
   nameModalInput: {
     backgroundColor: colors.surfaceLight,
     color: colors.textPrimary,
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 16,
     height: 50,
     fontSize: 16,

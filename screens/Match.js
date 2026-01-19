@@ -6,7 +6,6 @@ import {
     ScrollView,
     SafeAreaView,
     TouchableOpacity,
-    Image,
     TextInput,
     Platform,
     StatusBar,
@@ -38,9 +37,26 @@ const getAllianceTextColor = (driverStation) => {
 const MatchScreen = props => {
   const { navigation, route } = props;
 
-  // Simplified state - just fuel scored
+  // Scoring state
   const [autoFuelScored, setAutoFuelScored] = useState(0);
+  const [autoPasses, setAutoPasses] = useState(0);
   const [teleOpFuelScored, setTeleOpFuelScored] = useState(0);
+  const [teleOpPasses, setTeleOpPasses] = useState(0);
+
+  // Collapsible section state (all expanded by default)
+  const [autoExpanded, setAutoExpanded] = useState(true);
+  const [teleOpExpanded, setTeleOpExpanded] = useState(true);
+
+  // Auto reminder flash state
+  const [autoReminderActive, setAutoReminderActive] = useState(false);
+  const autoReminderTimeoutRef = useRef(null);
+  const autoFlashAnim = useRef(new Animated.Value(0)).current;
+  const autoFlashAnimRef = useRef(null);
+
+  // Auto countdown timer (15 seconds for FRC auto)
+  const [autoCountdown, setAutoCountdown] = useState(null);
+  const autoCountdownIntervalRef = useRef(null);
+  const autoStartTimeRef = useRef(null);
 
   const [isCommentModalVisible, setIsCommentModalVisible] = useState(false);
   const [commentValue, setCommentValue] = useState('');
@@ -53,13 +69,21 @@ const MatchScreen = props => {
 
   const [isTablet, setIsTablet] = useState(false);
 
-  // Recent change tracking
+  // Recent change tracking for fuel
   const [recentAutoChange, setRecentAutoChange] = useState(null);
   const [recentTeleOpChange, setRecentTeleOpChange] = useState(null);
   const autoTimeoutRef = useRef(null);
   const teleOpTimeoutRef = useRef(null);
   const autoTimerAnim = useRef(new Animated.Value(0)).current;
   const teleOpTimerAnim = useRef(new Animated.Value(0)).current;
+
+  // Recent change tracking for passes
+  const [recentAutoPassesChange, setRecentAutoPassesChange] = useState(null);
+  const [recentTeleOpPassesChange, setRecentTeleOpPassesChange] = useState(null);
+  const autoPassesTimeoutRef = useRef(null);
+  const teleOpPassesTimeoutRef = useRef(null);
+  const autoPassesTimerAnim = useRef(new Animated.Value(0)).current;
+  const teleOpPassesTimerAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const updateLayout = () => {
@@ -76,8 +100,71 @@ const MatchScreen = props => {
     return () => {
       if (autoTimeoutRef.current) clearTimeout(autoTimeoutRef.current);
       if (teleOpTimeoutRef.current) clearTimeout(teleOpTimeoutRef.current);
+      if (autoPassesTimeoutRef.current) clearTimeout(autoPassesTimeoutRef.current);
+      if (teleOpPassesTimeoutRef.current) clearTimeout(teleOpPassesTimeoutRef.current);
+      if (autoReminderTimeoutRef.current) clearTimeout(autoReminderTimeoutRef.current);
+      if (autoFlashAnimRef.current) autoFlashAnimRef.current.stop();
+      if (autoCountdownIntervalRef.current) clearInterval(autoCountdownIntervalRef.current);
     };
   }, []);
+
+  // Start flash animation when auto timer expires
+  const startAutoFlash = () => {
+    setAutoReminderActive(true);
+    // Haptic feedback to alert user
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    // Start pulsing animation - fast and attention-grabbing
+    autoFlashAnimRef.current = Animated.loop(
+      Animated.sequence([
+        Animated.timing(autoFlashAnim, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: false,
+        }),
+        Animated.timing(autoFlashAnim, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: false,
+        }),
+      ])
+    );
+    autoFlashAnimRef.current.start();
+  };
+
+  // Start auto countdown timer (starts on first auto interaction)
+  const startAutoCountdown = () => {
+    // Only start if not already running
+    if (autoStartTimeRef.current === null) {
+      autoStartTimeRef.current = Date.now();
+      setAutoCountdown(20);
+
+      autoCountdownIntervalRef.current = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - autoStartTimeRef.current) / 1000);
+        const remaining = Math.max(0, 20 - elapsed);
+        setAutoCountdown(remaining);
+
+        if (remaining === 0) {
+          clearInterval(autoCountdownIntervalRef.current);
+          // Start flashing when timer hits 0
+          startAutoFlash();
+        }
+      }, 100);
+    }
+  };
+
+  // Start auto reminder timer (resets on each auto field change)
+  const startAutoReminderTimer = () => {
+    // Start countdown on first auto interaction
+    startAutoCountdown();
+  };
+
+  // Stop auto reminder when collapsed or TeleOp is used
+  const stopAutoReminder = () => {
+    if (autoReminderTimeoutRef.current) clearTimeout(autoReminderTimeoutRef.current);
+    if (autoFlashAnimRef.current) autoFlashAnimRef.current.stop();
+    setAutoReminderActive(false);
+    autoFlashAnim.setValue(0);
+  };
 
   useEffect(() => {
     const loadExistingMatchData = async () => {
@@ -107,20 +194,38 @@ const MatchScreen = props => {
             setCommentValue(values[6] || '');
           }
 
-          // Load fuel scores (indices 7 and 8)
-          if (values.length >= 9) {
+          // Load scores - new structure with passes
+          // Index 7: Auto Fuel, 8: Auto Passes, 9: TeleOp Fuel, 10: TeleOp Passes, 11: Questions
+          if (values.length >= 11) {
+            const autoFuel = parseInt(values[7]);
+            const autoPas = parseInt(values[8]);
+            const teleOpFuel = parseInt(values[9]);
+            const teleOpPas = parseInt(values[10]);
+
+            if (!isNaN(autoFuel)) setAutoFuelScored(autoFuel);
+            if (!isNaN(autoPas)) setAutoPasses(autoPas);
+            if (!isNaN(teleOpFuel)) setTeleOpFuelScored(teleOpFuel);
+            if (!isNaN(teleOpPas)) setTeleOpPasses(teleOpPas);
+
+            // Questions at index 11
+            if (values.length > 11) {
+              setQuestionValue(values[11] || '');
+            }
+
+            console.log("Successfully loaded match data (new format)");
+          } else if (values.length >= 9) {
+            // Legacy format support: 7: Auto Fuel, 8: TeleOp Fuel, 9: Questions
             const auto = parseInt(values[7]);
             const teleOp = parseInt(values[8]);
 
             if (!isNaN(auto)) setAutoFuelScored(auto);
             if (!isNaN(teleOp)) setTeleOpFuelScored(teleOp);
 
-            // Questions at index 9
             if (values.length > 9) {
               setQuestionValue(values[9] || '');
             }
 
-            console.log("Successfully loaded match data");
+            console.log("Successfully loaded match data (legacy format)");
           }
         } catch (error) {
           console.error('Error loading match data:', error);
@@ -154,6 +259,9 @@ const MatchScreen = props => {
       autoTimeoutRef.current = setTimeout(() => {
         setRecentAutoChange(null);
       }, 10000);
+
+      // Start auto reminder timer
+      startAutoReminderTimer();
     }
   };
 
@@ -179,6 +287,57 @@ const MatchScreen = props => {
       teleOpTimeoutRef.current = setTimeout(() => {
         setRecentTeleOpChange(null);
       }, 10000);
+
+      // Stop auto reminder - user is in teleop now
+      stopAutoReminder();
+    }
+  };
+
+  const updateAutoPasses = (amount) => {
+    const newValue = autoPasses + amount;
+    if (newValue >= 0) {
+      setAutoPasses(newValue);
+      setRecentAutoPassesChange(prev => (prev || 0) + amount);
+
+      if (autoPassesTimeoutRef.current) clearTimeout(autoPassesTimeoutRef.current);
+
+      autoPassesTimerAnim.setValue(1);
+      Animated.timing(autoPassesTimerAnim, {
+        toValue: 0,
+        duration: 10000,
+        useNativeDriver: false,
+      }).start();
+
+      autoPassesTimeoutRef.current = setTimeout(() => {
+        setRecentAutoPassesChange(null);
+      }, 10000);
+
+      // Start auto reminder timer
+      startAutoReminderTimer();
+    }
+  };
+
+  const updateTeleOpPasses = (amount) => {
+    const newValue = teleOpPasses + amount;
+    if (newValue >= 0) {
+      setTeleOpPasses(newValue);
+      setRecentTeleOpPassesChange(prev => (prev || 0) + amount);
+
+      if (teleOpPassesTimeoutRef.current) clearTimeout(teleOpPassesTimeoutRef.current);
+
+      teleOpPassesTimerAnim.setValue(1);
+      Animated.timing(teleOpPassesTimerAnim, {
+        toValue: 0,
+        duration: 10000,
+        useNativeDriver: false,
+      }).start();
+
+      teleOpPassesTimeoutRef.current = setTimeout(() => {
+        setRecentTeleOpPassesChange(null);
+      }, 10000);
+
+      // Stop auto reminder - user is in teleop now
+      stopAutoReminder();
     }
   };
 
@@ -196,6 +355,8 @@ const MatchScreen = props => {
       }
 
       // Rebuild CSV with shared comment field at index 6
+      // New structure: Team, Match, TMA Key, Position, Alliance, Scout, Comments,
+      //                Auto Fuel, Auto Passes, TeleOp Fuel, TeleOp Passes, Questions
       const newData = [
         values[0], // Team
         values[1], // Match
@@ -205,7 +366,9 @@ const MatchScreen = props => {
         values[5], // Scout
         escapeCSVField(commentValue || ''), // Shared comment (editable in both Pregame and Match)
         autoFuelScored,
+        autoPasses,
         teleOpFuelScored,
+        teleOpPasses,
         escapeCSVField(questionValue || ''),
       ].join(',');
 
@@ -237,16 +400,13 @@ const MatchScreen = props => {
               style={styles.questionButton}
               onPress={() => setIsQuestionModalVisible(true)}
             >
-              <MaterialIcons name="help" size={30} color={colors.primary} />
+              <MaterialIcons name="live-help" size={28} color={colors.primary} />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.commentButton}
               onPress={() => setIsCommentModalVisible(true)}
             >
-              <Image
-                source={require("../assets/images/comment-icon.png")}
-                style={styles.commentIcon}
-              />
+              <MaterialIcons name="chat-bubble" size={28} color={colors.primary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -271,36 +431,129 @@ const MatchScreen = props => {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.mainContent}>
-          {/* Auto Fuel Section */}
-          <View style={[styles.section, styles.autoSection]}>
-            <View style={[styles.sectionHeader, styles.autoHeader]}>
-              <Text style={[styles.sectionTitle, isTablet && styles.sectionTitleTablet]}>Auto Fuel Scored</Text>
-            </View>
-            <View style={[styles.sectionContent, isTablet && styles.sectionContentTablet]}>
-              <FuelCounter
-                value={autoFuelScored}
-                onUpdate={updateAutoFuel}
-                isTablet={isTablet}
-                recentChange={recentAutoChange}
-                timerAnim={autoTimerAnim}
-              />
-            </View>
-          </View>
+          {/* Auto Section */}
+          <Animated.View style={[
+            styles.section,
+            styles.autoSection,
+            autoReminderActive && {
+              backgroundColor: autoFlashAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['#3d3520', '#8B0000'],
+              }),
+              borderColor: '#ff0000',
+              borderWidth: 4,
+            }
+          ]}>
+            <TouchableOpacity
+              style={[styles.sectionHeader, styles.autoHeader]}
+              onPress={() => {
+                setAutoExpanded(!autoExpanded);
+                if (autoExpanded) stopAutoReminder(); // Stop reminder when collapsing
+              }}
+            >
+              <View style={styles.sectionTitleRow}>
+                <Text style={[styles.sectionTitle, isTablet && styles.sectionTitleTablet]}>Auto</Text>
+                {autoCountdown !== null && (
+                  <View style={[
+                    styles.countdownBadge,
+                    autoCountdown === 0 && styles.countdownBadgeExpired
+                  ]}>
+                    <Text style={[
+                      styles.countdownText,
+                      autoCountdown === 0 && styles.countdownTextExpired
+                    ]}>
+                      {autoCountdown === 0 ? 'DONE' : `${autoCountdown}s`}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <View style={styles.sectionHeaderRight}>
+                <Text style={[styles.sectionSummary, isTablet && styles.sectionSummaryTablet]}>
+                  {autoFuelScored} fuel, {autoPasses} passes
+                </Text>
+                <Text style={styles.expandIcon}>{autoExpanded ? '−' : '+'}</Text>
+              </View>
+            </TouchableOpacity>
 
-          {/* TeleOp Fuel Section */}
+            {autoExpanded && (
+              <>
+                {/* Auto Fuel */}
+                <View style={styles.subsectionHeader}>
+                  <Text style={[styles.subsectionTitle, isTablet && styles.subsectionTitleTablet]}>Fuel Scored</Text>
+                </View>
+                <View style={[styles.subsectionContent, isTablet && styles.subsectionContentTablet]}>
+                  <FuelCounter
+                    value={autoFuelScored}
+                    onUpdate={updateAutoFuel}
+                    isTablet={isTablet}
+                    recentChange={recentAutoChange}
+                    timerAnim={autoTimerAnim}
+                  />
+                </View>
+
+                {/* Auto Passes */}
+                <View style={styles.subsectionHeader}>
+                  <Text style={[styles.subsectionTitle, isTablet && styles.subsectionTitleTablet]}>Passes</Text>
+                </View>
+                <View style={[styles.subsectionContent, styles.subsectionContentLast, isTablet && styles.subsectionContentTablet]}>
+                  <FuelCounter
+                    value={autoPasses}
+                    onUpdate={updateAutoPasses}
+                    isTablet={isTablet}
+                    recentChange={recentAutoPassesChange}
+                    timerAnim={autoPassesTimerAnim}
+                  />
+                </View>
+              </>
+            )}
+          </Animated.View>
+
+          {/* TeleOp Section */}
           <View style={[styles.section, styles.teleOpSection]}>
-            <View style={[styles.sectionHeader, styles.teleOpHeader]}>
-              <Text style={[styles.sectionTitle, isTablet && styles.sectionTitleTablet]}>TeleOp Fuel Scored</Text>
-            </View>
-            <View style={[styles.sectionContent, isTablet && styles.sectionContentTablet]}>
-              <FuelCounter
-                value={teleOpFuelScored}
-                onUpdate={updateTeleOpFuel}
-                isTablet={isTablet}
-                recentChange={recentTeleOpChange}
-                timerAnim={teleOpTimerAnim}
-              />
-            </View>
+            <TouchableOpacity
+              style={[styles.sectionHeader, styles.teleOpHeader]}
+              onPress={() => setTeleOpExpanded(!teleOpExpanded)}
+            >
+              <Text style={[styles.sectionTitle, isTablet && styles.sectionTitleTablet]}>TeleOp</Text>
+              <View style={styles.sectionHeaderRight}>
+                <Text style={[styles.sectionSummary, isTablet && styles.sectionSummaryTablet]}>
+                  {teleOpFuelScored} fuel, {teleOpPasses} passes
+                </Text>
+                <Text style={styles.expandIcon}>{teleOpExpanded ? '−' : '+'}</Text>
+              </View>
+            </TouchableOpacity>
+
+            {teleOpExpanded && (
+              <>
+                {/* TeleOp Fuel */}
+                <View style={styles.subsectionHeader}>
+                  <Text style={[styles.subsectionTitle, isTablet && styles.subsectionTitleTablet]}>Fuel Scored</Text>
+                </View>
+                <View style={[styles.subsectionContent, isTablet && styles.subsectionContentTablet]}>
+                  <FuelCounter
+                    value={teleOpFuelScored}
+                    onUpdate={updateTeleOpFuel}
+                    isTablet={isTablet}
+                    recentChange={recentTeleOpChange}
+                    timerAnim={teleOpTimerAnim}
+                  />
+                </View>
+
+                {/* TeleOp Passes */}
+                <View style={styles.subsectionHeader}>
+                  <Text style={[styles.subsectionTitle, isTablet && styles.subsectionTitleTablet]}>Passes</Text>
+                </View>
+                <View style={[styles.subsectionContent, styles.subsectionContentLast, isTablet && styles.subsectionContentTablet]}>
+                  <FuelCounter
+                    value={teleOpPasses}
+                    onUpdate={updateTeleOpPasses}
+                    isTablet={isTablet}
+                    recentChange={recentTeleOpPassesChange}
+                    timerAnim={teleOpPassesTimerAnim}
+                  />
+                </View>
+              </>
+            )}
           </View>
 
           {/* Submit Button */}
@@ -635,12 +888,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  commentIcon: {
-    width: 30,
-    height: 30,
-    tintColor: colors.primary,
-  },
-
   scrollView: {
     flex: 1,
     backgroundColor: colors.background,
@@ -676,7 +923,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.black,
     paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 10,
+    borderRadius: 6,
   },
 
   teamBadgeRed: {
@@ -695,45 +942,87 @@ const styles = StyleSheet.create({
 
   section: {
     backgroundColor: colors.surface,
-    borderRadius: 20,
+    borderRadius: 8,
     marginBottom: 20,
     shadowColor: colors.black,
     shadowOffset: {
       width: 0,
-      height: 8,
+      height: 4,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
     elevation: 5,
   },
 
   autoSection: {
-    backgroundColor: colors.surface,
+    backgroundColor: '#3d3520',
   },
 
   teleOpSection: {
-    backgroundColor: colors.surface,
+    backgroundColor: '#202535',
   },
 
   sectionHeader: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.surfaceBorder,
   },
 
+  sectionHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+
+  sectionSummary: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+
+  sectionSummaryTablet: {
+    fontSize: 16,
+  },
+
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+
+  countdownBadge: {
+    backgroundColor: '#ff6b00',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+
+  countdownBadgeExpired: {
+    backgroundColor: '#cc0000',
+  },
+
+  countdownText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+
+  countdownTextExpired: {
+    color: '#fff',
+  },
+
   autoHeader: {
-    backgroundColor: 'rgba(255, 180, 50, 0.3)',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: '#5a4a25',
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
   },
 
   teleOpHeader: {
-    backgroundColor: colors.surfaceLight,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: '#2a3550',
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
   },
 
   sectionTitle: {
@@ -755,6 +1044,68 @@ const styles = StyleSheet.create({
     padding: 30,
   },
 
+  // Collapsible subsection styles
+  subsectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surfaceBorder,
+  },
+
+  subsectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+
+  subsectionTitleTablet: {
+    fontSize: 20,
+  },
+
+  subsectionRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+
+  subsectionValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.textPrimary,
+    minWidth: 30,
+    textAlign: 'right',
+  },
+
+  subsectionValueTablet: {
+    fontSize: 24,
+    minWidth: 40,
+  },
+
+  expandIcon: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.textSecondary,
+    width: 20,
+    textAlign: 'center',
+  },
+
+  subsectionContent: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.surfaceBorder,
+  },
+
+  subsectionContentLast: {
+    borderBottomWidth: 0,
+  },
+
+  subsectionContentTablet: {
+    padding: 24,
+  },
+
   // Fuel counter styles
   fuelCounterContainer: {
     alignItems: 'center',
@@ -774,7 +1125,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 3,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 10,
+    borderRadius: 8,
     shadowColor: colors.black,
     shadowOffset: {
       width: 0,
@@ -788,7 +1139,7 @@ const styles = StyleSheet.create({
   fuelButtonTablet: {
     height: 80,
     marginHorizontal: 8,
-    borderRadius: 16,
+    borderRadius: 8,
   },
 
   decrementButton: {
@@ -878,7 +1229,7 @@ const styles = StyleSheet.create({
   submitButton: {
     backgroundColor: colors.buttonPrimary,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 8,
     alignItems: 'center',
     marginVertical: 20,
     shadowColor: colors.black,
@@ -912,7 +1263,7 @@ const styles = StyleSheet.create({
 
   modalContent: {
     backgroundColor: colors.surface,
-    borderRadius: 20,
+    borderRadius: 8,
     padding: 24,
     width: '90%',
     maxWidth: 400,
@@ -941,7 +1292,7 @@ const styles = StyleSheet.create({
   modalInput: {
     backgroundColor: colors.surfaceLight,
     color: colors.textPrimary,
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 16,
     height: 300,
     fontSize: 16,
@@ -958,7 +1309,7 @@ const styles = StyleSheet.create({
 
   modalButton: {
     padding: 12,
-    borderRadius: 12,
+    borderRadius: 8,
     alignItems: 'center',
   },
 

@@ -498,15 +498,15 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 24,
     backgroundColor: colors.surface,
-    borderRadius: 20,
+    borderRadius: 8,
     padding: 24,
     shadowColor: colors.black,
     shadowOffset: {
       width: 0,
-      height: 8,
+      height: 4,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
     elevation: 5,
   },
 
@@ -538,7 +538,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.surfaceLight,
     color: colors.textPrimary,
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 16,
     fontSize: 16,
     marginBottom: 10,
@@ -555,16 +555,16 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: colors.buttonPrimary,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 8,
     alignItems: "center",
     marginTop: 10,
     shadowColor: colors.black,
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 2,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
     elevation: 3,
   },
 
@@ -593,15 +593,15 @@ const styles = StyleSheet.create({
   stationPicker: {
     marginTop: 10,
     backgroundColor: colors.surfaceLight,
-    borderRadius: 12,
+    borderRadius: 8,
     overflow: "hidden",
     shadowColor: colors.black,
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 2,
     },
     shadowOpacity: 0.2,
-    shadowRadius: 8,
+    shadowRadius: 4,
     elevation: 3,
   },
 
@@ -633,7 +633,7 @@ const styles = StyleSheet.create({
 
   eventCodeDisplay: {
     backgroundColor: colors.surfaceLight,
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 12,
     marginBottom: 16,
     flexDirection: "row",

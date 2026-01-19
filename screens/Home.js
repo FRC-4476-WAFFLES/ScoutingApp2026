@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
     ribbonTablet: {
       paddingVertical: 16,
       paddingHorizontal: 28,
-      borderRadius: 12,
+      borderRadius: 8,
     },
 
     ribbonText: {
@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
     },
   
     button: {
-      borderRadius: 12,
+      borderRadius: 8,
       paddingVertical: 16,
       paddingHorizontal: 32,
       backgroundColor: "#000000",
@@ -347,8 +347,8 @@ const styles = StyleSheet.create({
         width: 0,
         height: 2,
       },
-      shadowOpacity: 0.25,
-      shadowRadius: 3.84,
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
     },
 
     buttonLandscape: {
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
     settingsButton: {
       padding: 12,
       backgroundColor: '#000000',
-      borderRadius: 12,
+      borderRadius: 8,
     },
 
     settingsIcon: {
