@@ -19,6 +19,7 @@ import {
 
 import * as FileSystem from "expo-file-system/legacy";
 import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import { MaterialIcons } from '@expo/vector-icons';
 import { colors } from "../components/colors";
 
@@ -227,7 +228,6 @@ const MatchScreen = props => {
           >
             <Text style={styles.backButtonText}>←</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Match {route.params.matchNum}</Text>
           <View style={styles.headerButtons}>
             <TouchableOpacity
               style={styles.questionButton}
@@ -248,17 +248,16 @@ const MatchScreen = props => {
         </View>
       </View>
 
-      {/* Team Number Header */}
-      <View style={[
-        styles.teamHeaderContainer,
-        driverStation && { backgroundColor: getAllianceColor(driverStation) }
-      ]}>
-        <Text style={[
-          styles.teamHeader,
-          { color: getAllianceTextColor(driverStation) }
+      {/* Match & Team Info */}
+      <View style={styles.matchInfoContainer}>
+        <Text style={styles.matchNumber}>Match {route.params.matchNum}</Text>
+        <View style={[
+          styles.teamBadge,
+          driverStation?.charAt(0) === 'R' && styles.teamBadgeRed,
+          driverStation?.charAt(0) === 'B' && styles.teamBadgeBlue,
         ]}>
-          Team {route.params.teamNum}
-        </Text>
+          <Text style={styles.teamNumber}>Team {route.params.teamNum}</Text>
+        </View>
       </View>
 
       {/* Main Content */}
@@ -392,68 +391,167 @@ const MatchScreen = props => {
   );
 }
 
+// Animated button component with press scale and haptic feedback
+const AnimatedButton = ({ onPress, style, children, isTablet }) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.9,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 4,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 8,
+    }).start();
+  };
+
+  const handlePress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onPress();
+  };
+
+  return (
+    <Animated.View style={{ transform: [{ scale: scaleAnim }], flex: 1 }}>
+      <TouchableOpacity
+        style={style}
+        onPress={handlePress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={1}
+      >
+        {children}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
 // Fuel counter component with -10, -1, value, +1, +10 buttons
-const FuelCounter = ({ value, onUpdate, isTablet, recentChange, timerAnim }) => (
-  <View style={styles.fuelCounterContainer}>
-    <View style={styles.fuelCounterRow}>
-      <TouchableOpacity
-        style={[styles.fuelButton, styles.decrementButton, isTablet && styles.fuelButtonTablet]}
-        onPress={() => onUpdate(-10)}
-      >
-        <Text style={[styles.fuelButtonText, isTablet && styles.fuelButtonTextTablet]}>-10</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.fuelButton, styles.decrementButton, isTablet && styles.fuelButtonTablet]}
-        onPress={() => onUpdate(-1)}
-      >
-        <Text style={[styles.fuelButtonText, isTablet && styles.fuelButtonTextTablet]}>-1</Text>
-      </TouchableOpacity>
-      <View style={[styles.fuelValueContainer, isTablet && styles.fuelValueContainerTablet]}>
-        <Text style={[styles.fuelValue, isTablet && styles.fuelValueTablet]}>{value}</Text>
+const FuelCounter = ({ value, onUpdate, isTablet, recentChange, timerAnim }) => {
+  const valueScaleAnim = useRef(new Animated.Value(1)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const prevRecentChange = useRef(recentChange);
+
+  // Bounce animation when value changes
+  useEffect(() => {
+    Animated.sequence([
+      Animated.timing(valueScaleAnim, {
+        toValue: 1.2,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.spring(valueScaleAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        speed: 20,
+        bounciness: 12,
+      }),
+    ]).start();
+  }, [value]);
+
+  // Fade in/out for recent change
+  useEffect(() => {
+    if (recentChange !== null && prevRecentChange.current === null) {
+      // Fade in
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    } else if (recentChange === null && prevRecentChange.current !== null) {
+      // Fade out
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } else if (recentChange !== null) {
+      // Keep visible
+      fadeAnim.setValue(1);
+    }
+    prevRecentChange.current = recentChange;
+  }, [recentChange]);
+
+  return (
+    <View style={styles.fuelCounterContainer}>
+      <View style={styles.fuelCounterRow}>
+        <AnimatedButton
+          style={[styles.fuelButton, styles.decrementButton, isTablet && styles.fuelButtonTablet]}
+          onPress={() => onUpdate(-10)}
+          isTablet={isTablet}
+        >
+          <Text style={[styles.fuelButtonText, isTablet && styles.fuelButtonTextTablet]}>-10</Text>
+        </AnimatedButton>
+        <AnimatedButton
+          style={[styles.fuelButton, styles.decrementButton, isTablet && styles.fuelButtonTablet]}
+          onPress={() => onUpdate(-1)}
+          isTablet={isTablet}
+        >
+          <Text style={[styles.fuelButtonText, isTablet && styles.fuelButtonTextTablet]}>-1</Text>
+        </AnimatedButton>
+        <View style={[styles.fuelValueContainer, isTablet && styles.fuelValueContainerTablet]}>
+          <Animated.Text
+            style={[
+              styles.fuelValue,
+              isTablet && styles.fuelValueTablet,
+              { transform: [{ scale: valueScaleAnim }] }
+            ]}
+          >
+            {value}
+          </Animated.Text>
+        </View>
+        <AnimatedButton
+          style={[styles.fuelButton, styles.incrementButton, isTablet && styles.fuelButtonTablet]}
+          onPress={() => onUpdate(1)}
+          isTablet={isTablet}
+        >
+          <Text style={[styles.fuelButtonText, isTablet && styles.fuelButtonTextTablet]}>+1</Text>
+        </AnimatedButton>
+        <AnimatedButton
+          style={[styles.fuelButton, styles.incrementButton, isTablet && styles.fuelButtonTablet]}
+          onPress={() => onUpdate(10)}
+          isTablet={isTablet}
+        >
+          <Text style={[styles.fuelButtonText, isTablet && styles.fuelButtonTextTablet]}>+10</Text>
+        </AnimatedButton>
       </View>
-      <TouchableOpacity
-        style={[styles.fuelButton, styles.incrementButton, isTablet && styles.fuelButtonTablet]}
-        onPress={() => onUpdate(1)}
-      >
-        <Text style={[styles.fuelButtonText, isTablet && styles.fuelButtonTextTablet]}>+1</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.fuelButton, styles.incrementButton, isTablet && styles.fuelButtonTablet]}
-        onPress={() => onUpdate(10)}
-      >
-        <Text style={[styles.fuelButtonText, isTablet && styles.fuelButtonTextTablet]}>+10</Text>
-      </TouchableOpacity>
-    </View>
-    {/* Recent change indicator */}
-    <View style={[styles.recentChangeContainer, isTablet && styles.recentChangeContainerTablet]}>
-      {recentChange !== null && (
-        <Text style={[
+      {/* Recent change indicator */}
+      <View style={[styles.recentChangeContainer, isTablet && styles.recentChangeContainerTablet]}>
+        <Animated.Text style={[
           styles.recentChangeText,
           isTablet && styles.recentChangeTextTablet,
-          recentChange > 0 ? styles.recentChangePositive : styles.recentChangeNegative
+          recentChange > 0 ? styles.recentChangePositive : styles.recentChangeNegative,
+          { opacity: fadeAnim }
         ]}>
-          {recentChange > 0 ? `+${recentChange}` : recentChange}
-        </Text>
+          {recentChange !== null ? (recentChange > 0 ? `+${recentChange}` : recentChange) : ' '}
+        </Animated.Text>
+      </View>
+      {/* Timer bar */}
+      {recentChange !== null && (
+        <View style={styles.timerBarContainer}>
+          <Animated.View
+            style={[
+              styles.timerBar,
+              {
+                width: timerAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0%', '100%'],
+                }),
+              },
+            ]}
+          />
+        </View>
       )}
     </View>
-    {/* Timer bar */}
-    {recentChange !== null && (
-      <View style={styles.timerBarContainer}>
-        <Animated.View
-          style={[
-            styles.timerBar,
-            {
-              width: timerAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: ['0%', '100%'],
-              }),
-            },
-          ]}
-        />
-      </View>
-    )}
-  </View>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -473,6 +571,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     position: 'absolute',
     bottom: 15,
     left: 0,
@@ -506,14 +605,6 @@ const styles = StyleSheet.create({
     width: 48,
     textAlign: 'center',
     textAlignVertical: 'center',
-  },
-
-  title: {
-    flex: 1,
-    fontSize: 28,
-    fontFamily: 'Cooper-Black',
-    color: colors.black,
-    textAlign: "center",
   },
 
   headerButtons: {
@@ -561,19 +652,41 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  teamHeaderContainer: {
-    padding: 15,
-    borderBottomWidth: 2,
-    borderBottomColor: colors.black,
-    backgroundColor: colors.surface,
-    zIndex: 1,
+  matchInfoContainer: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    backgroundColor: colors.background,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 24,
   },
 
-  teamHeader: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    color: colors.textPrimary,
+  matchNumber: {
+    fontSize: 22,
+    fontFamily: 'Cooper-Black',
+    color: colors.black,
+  },
+
+  teamBadge: {
+    backgroundColor: colors.black,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+  },
+
+  teamBadgeRed: {
+    backgroundColor: '#cc2222',
+  },
+
+  teamBadgeBlue: {
+    backgroundColor: '#2255cc',
+  },
+
+  teamNumber: {
+    fontSize: 20,
+    fontFamily: 'Cooper-Black',
+    color: colors.white,
   },
 
   section: {
@@ -661,11 +774,11 @@ const styles = StyleSheet.create({
     shadowColor: colors.black,
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 3,
     },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 4,
   },
 
   fuelButtonTablet: {

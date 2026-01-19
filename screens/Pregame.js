@@ -268,7 +268,10 @@ const PregameScreen = (props) => {
                 {!isPracticeMode && (
                   <TouchableOpacity
                     style={[styles.button, isTablet && styles.buttonTablet]}
-                    onPress={async () => await findMatch()}
+                    onPress={async () => {
+                      Keyboard.dismiss();
+                      await findMatch();
+                    }}
                   >
                     <Text style={[styles.smallerButtonText, isTablet && styles.smallerButtonTextTablet]}>Find Match</Text>
                   </TouchableOpacity>
