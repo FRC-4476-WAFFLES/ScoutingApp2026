@@ -12,11 +12,11 @@ export const colors = {
   // Text
   textPrimary: "#FFD700",    // Gold text on dark backgrounds
   textSecondary: "#999999",  // Muted text
-  textOnPrimary: "#000000",  // Black text on gold buttons
+  textOnPrimary: "#FFD700",  // Gold text on black buttons
   textOnSurface: "#FFD700",  // Gold text on dark surfaces
 
   // Buttons
-  buttonPrimary: "#FFD700",  // Gold buttons
+  buttonPrimary: "#000000",  // Black buttons (visible on yellow bg)
   buttonSecondary: "#333333", // Dark secondary buttons
   buttonDisabled: "#444444",
 

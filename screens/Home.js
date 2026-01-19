@@ -157,6 +157,7 @@ const HomeScreen = props => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
       <ImageBackground
         style={styles.backdrop}
         source={require("../assets/images/HomeScreen/backdrop.png")}

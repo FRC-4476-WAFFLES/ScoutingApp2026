@@ -263,9 +263,12 @@ const SettingsScreen = (props) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Sticky Header */}
-      <View style={styles.headerContainer}>
+    <View style={styles.statusBarBackground}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.black} />
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.container}>
+          {/* Sticky Header */}
+          <View style={styles.headerContainer}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
             <Text style={styles.backButtonText}>←</Text>
@@ -422,29 +425,50 @@ const SettingsScreen = (props) => {
             Clear All Match Data
           </Text>
         </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+        </View>
+        </View>
+      </SafeAreaView>
+    </View>
   );
 };
 
 // Settings stylesheet
 const styles = StyleSheet.create({
+  statusBarBackground: {
+    flex: 1,
+    backgroundColor: colors.black,
+  },
+
+  safeArea: {
+    flex: 1,
+  },
+
   container: {
     flex: 1,
     backgroundColor: colors.background,
   },
 
   headerContainer: {
-    borderBottomWidth: 2,
-    borderBottomColor: colors.black,
-    height: Platform.OS === "android" ? StatusBar.currentHeight + 70 : 80,
+    backgroundColor: colors.black,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    height: Platform.OS === "android" ? StatusBar.currentHeight + 75 : 85,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 15,
+    zIndex: 10,
   },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
     position: "absolute",
-    bottom: 15,
+    bottom: 18,
     left: 0,
     right: 0,
     paddingHorizontal: 20,
@@ -464,26 +488,20 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 28,
     fontFamily: "Cooper-Black",
-    color: colors.black,
+    color: colors.primary,
     textAlign: "center",
     marginRight: 32,
   },
 
   backButton: {
-    backgroundColor: colors.black,
+    backgroundColor: colors.surface,
     width: 48,
     height: 48,
     borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 2,
+    borderColor: colors.primary,
   },
 
   backButtonText: {

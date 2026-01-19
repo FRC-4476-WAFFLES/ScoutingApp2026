@@ -24,6 +24,8 @@ import { colors } from "../components/colors";
 import { parseCSV, escapeCSVField } from "../utils/csv";
 import { useSettings } from "../contexts/SettingsContext";
 
+const SCOUT_HISTORY_FILE = FileSystem.documentDirectory + "scoutHistory.json";
+
 const getAllianceColor = (driverStation) => {
   if (!driverStation) return null;
   return driverStation.charAt(0) === 'R' ? colors.redAlliance : colors.blueAlliance;
@@ -60,9 +62,6 @@ const MatchScreen = props => {
 
   const [isCommentModalVisible, setIsCommentModalVisible] = useState(false);
   const [commentValue, setCommentValue] = useState('');
-
-  const [isQuestionModalVisible, setIsQuestionModalVisible] = useState(false);
-  const [questionValue, setQuestionValue] = useState('');
 
   // Get settings from context
   const { driverStation } = useSettings();
@@ -207,23 +206,14 @@ const MatchScreen = props => {
             if (!isNaN(teleOpFuel)) setTeleOpFuelScored(teleOpFuel);
             if (!isNaN(teleOpPas)) setTeleOpPasses(teleOpPas);
 
-            // Questions at index 11
-            if (values.length > 11) {
-              setQuestionValue(values[11] || '');
-            }
-
             console.log("Successfully loaded match data (new format)");
           } else if (values.length >= 9) {
-            // Legacy format support: 7: Auto Fuel, 8: TeleOp Fuel, 9: Questions
+            // Legacy format support: 7: Auto Fuel, 8: TeleOp Fuel
             const auto = parseInt(values[7]);
             const teleOp = parseInt(values[8]);
 
             if (!isNaN(auto)) setAutoFuelScored(auto);
             if (!isNaN(teleOp)) setTeleOpFuelScored(teleOp);
-
-            if (values.length > 9) {
-              setQuestionValue(values[9] || '');
-            }
 
             console.log("Successfully loaded match data (legacy format)");
           }
@@ -357,6 +347,7 @@ const MatchScreen = props => {
       // Rebuild CSV with shared comment field at index 6
       // New structure: Team, Match, TMA Key, Position, Alliance, Scout, Comments,
       //                Auto Fuel, Auto Passes, TeleOp Fuel, TeleOp Passes, Questions
+      // Questions field left empty - edited on TeamComparison screen
       const newData = [
         values[0], // Team
         values[1], // Match
@@ -369,7 +360,7 @@ const MatchScreen = props => {
         autoPasses,
         teleOpFuelScored,
         teleOpPasses,
-        escapeCSVField(questionValue || ''),
+        '', // Questions - edited on TeamComparison screen
       ].join(',');
 
       await FileSystem.writeAsStringAsync(csvURI, newData);
@@ -381,10 +372,73 @@ const MatchScreen = props => {
     }
   };
 
+  // Get the last scouted team info from storage
+  const getScoutHistory = async () => {
+    try {
+      const fileInfo = await FileSystem.getInfoAsync(SCOUT_HISTORY_FILE);
+      if (fileInfo.exists) {
+        const data = await FileSystem.readAsStringAsync(SCOUT_HISTORY_FILE);
+        return JSON.parse(data);
+      }
+    } catch (error) {
+      console.error("Error reading scout history:", error);
+    }
+    return null;
+  };
+
+  // Save the current scout info for next comparison
+  const saveScoutHistory = async (scoutName, teamNum) => {
+    try {
+      const history = { scoutName, teamNum, timestamp: Date.now() };
+      await FileSystem.writeAsStringAsync(SCOUT_HISTORY_FILE, JSON.stringify(history));
+    } catch (error) {
+      console.error("Error saving scout history:", error);
+    }
+  };
+
+  // Handle submit - check if we should show comparison screen
+  const handleSubmit = async () => {
+    const data = await saveMatchData();
+    if (!data) return;
+
+    await Clipboard.setStringAsync(data);
+
+    // Get current scout name from the CSV data
+    const values = parseCSV(data);
+    const currentScoutName = values?.[5];
+    const currentTeam = route.params.teamNum;
+
+    // Check if we have a previous scouted team by the same scout
+    const history = await getScoutHistory();
+
+    // If same scout and has previous team, show comparison
+    if (history && history.scoutName === currentScoutName && history.teamNum !== currentTeam) {
+      navigation.navigate("TeamComparison", {
+        matchNum: route.params.matchNum,
+        data: data,
+        currentTeam: currentTeam,
+        previousTeam: history.teamNum,
+        scoutName: currentScoutName,
+      });
+    } else {
+      // No comparison needed - save history and go straight to QR code
+      await saveScoutHistory(currentScoutName, currentTeam);
+      // Add empty comparison fields to keep CSV structure consistent (3 fields: current, previous, result)
+      const dataWithEmptyComparison = `${data},,,`;
+      navigation.navigate("QRCode", {
+        matchNum: route.params.matchNum,
+        data: dataWithEmptyComparison,
+      });
+    }
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.headerContainer}>
+    <View style={styles.statusBarBackground}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.black} />
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.container}>
+          {/* Header */}
+          <View style={styles.headerContainer}>
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
@@ -395,20 +449,13 @@ const MatchScreen = props => {
           >
             <Text style={styles.backButtonText}>←</Text>
           </TouchableOpacity>
-          <View style={styles.headerButtons}>
-            <TouchableOpacity
-              style={styles.questionButton}
-              onPress={() => setIsQuestionModalVisible(true)}
-            >
-              <MaterialIcons name="live-help" size={28} color={colors.primary} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.commentButton}
-              onPress={() => setIsCommentModalVisible(true)}
-            >
-              <MaterialIcons name="chat-bubble" size={28} color={colors.primary} />
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.title}>Match</Text>
+          <TouchableOpacity
+            style={styles.commentButton}
+            onPress={() => setIsCommentModalVisible(true)}
+          >
+            <MaterialIcons name="chat-bubble" size={28} color={colors.primary} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -559,16 +606,7 @@ const MatchScreen = props => {
           {/* Submit Button */}
           <TouchableOpacity
             style={styles.submitButton}
-            onPress={async () => {
-              const data = await saveMatchData();
-              if (data) {
-                await Clipboard.setStringAsync(data);
-                navigation.navigate("QRCode", {
-                  matchNum: route.params.matchNum,
-                  data: data,
-                });
-              }
-            }}
+            onPress={handleSubmit}
           >
             <Text style={styles.buttonText}>Submit Match</Text>
           </TouchableOpacity>
@@ -610,41 +648,9 @@ const MatchScreen = props => {
         </TouchableWithoutFeedback>
       </Modal>
 
-      {/* Question Modal */}
-      <Modal
-        animationType="fade"
-        transparent={true}
-        visible={isQuestionModalVisible}
-        onRequestClose={() => setIsQuestionModalVisible(false)}
-      >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback>
-              <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>Questions/Clarifications</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  multiline
-                  value={questionValue}
-                  onChangeText={setQuestionValue}
-                  placeholder="Enter questions or clarifications..."
-                  placeholderTextColor="rgba(255, 215, 0, 0.5)"
-                  autoFocus={true}
-                />
-                <View style={styles.modalButtons}>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.cancelButton, { flex: 1 }]}
-                    onPress={() => setIsQuestionModalVisible(false)}
-                  >
-                    <Text style={styles.modalButtonText}>Close</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-    </SafeAreaView>
+        </View>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -811,18 +817,36 @@ const FuelCounter = ({ value, onUpdate, isTablet, recentChange, timerAnim }) => 
 };
 
 const styles = StyleSheet.create({
+  statusBarBackground: {
+    flex: 1,
+    backgroundColor: colors.black,
+  },
+
+  safeArea: {
+    flex: 1,
+  },
+
   container: {
     flex: 1,
     backgroundColor: colors.background,
   },
 
   headerContainer: {
-    backgroundColor: colors.background,
-    borderBottomWidth: 2,
-    borderBottomColor: colors.black,
+    backgroundColor: colors.black,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
     height: Platform.OS === "android" ?
-      StatusBar.currentHeight + 70 :
-      80,
+      StatusBar.currentHeight + 75 :
+      85,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 15,
+    zIndex: 10,
   },
 
   header: {
@@ -830,7 +854,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     position: 'absolute',
-    bottom: 15,
+    bottom: 18,
     left: 0,
     right: 0,
     paddingHorizontal: 20,
@@ -838,54 +862,41 @@ const styles = StyleSheet.create({
   },
 
   backButton: {
-    backgroundColor: colors.black,
+    backgroundColor: colors.surface,
     width: 48,
     height: 48,
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 2,
+    borderColor: colors.primary,
   },
 
   backButtonText: {
     fontSize: 27,
     color: colors.primary,
     fontWeight: '900',
-    lineHeight: 48,
-    width: 48,
     textAlign: 'center',
     textAlignVertical: 'center',
+    includeFontPadding: false,
   },
 
-  headerButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-
-  questionButton: {
-    backgroundColor: colors.black,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
+  title: {
+    fontSize: 24,
+    fontFamily: 'Cooper-Black',
+    color: colors.primary,
+    textAlign: 'center',
   },
 
   commentButton: {
-    backgroundColor: colors.black,
+    backgroundColor: colors.surface,
     width: 48,
     height: 48,
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.primary,
   },
 
   scrollView: {

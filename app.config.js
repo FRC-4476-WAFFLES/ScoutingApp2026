@@ -2,7 +2,7 @@ export default {
   expo: {
     name: "ScoutingApp2026",
     slug: "scouting-2026",
-    version: "2026.1.1",
+    version: "2026.2.1",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",

@@ -70,7 +70,8 @@ const PregameScreen = (props) => {
       setMatchNum(route.params.matchNum);
       setCommentValue("");
       if (!isPracticeMode) {
-        findMatch();
+        // Pass matchNum directly to avoid async state timing issues
+        findMatch(route.params.matchNum);
       } else {
         setTeamNum(undefined);
       }
@@ -167,9 +168,11 @@ const PregameScreen = (props) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={{ flex: 1 }}>
-        {/* Header */}
+    <View style={styles.statusBarBackground}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.black} />
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.container}>
+          {/* Header */}
           <View style={styles.headerContainer}>
             <View style={styles.header}>
               <TouchableOpacity
@@ -388,7 +391,10 @@ const PregameScreen = (props) => {
                 }
               }}
             >
-              <Text style={[styles.smallerButtonText, isTablet && styles.smallerButtonTextTablet]}>Start Match</Text>
+              <Text style={[
+                styles.smallerButtonText,
+                isTablet && styles.smallerButtonTextTablet,
+              ]}>Start Match</Text>
             </TouchableOpacity>
           </ScrollView>
 
@@ -433,17 +439,21 @@ const PregameScreen = (props) => {
             </TouchableWithoutFeedback>
           </Modal>
         </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 
   // Get the team number from the match schedule file based on the match number and driver station
-  async function findMatch() {
-    if (!matchNum) {
+  // Optional matchNumParam allows passing match number directly (avoids async state timing issues)
+  async function findMatch(matchNumParam) {
+    const matchNumToUse = matchNumParam !== undefined ? matchNumParam : matchNum;
+
+    if (!matchNumToUse) {
       alert("Please enter a match number");
       return;
     }
 
-    if (matchNum < minMatchNum || matchNum > maxMatchNum) {
+    if (matchNumToUse < minMatchNum || matchNumToUse > maxMatchNum) {
       alert(
         `Invalid match number. Please enter a match number between ${minMatchNum} and ${maxMatchNum}`
       );
@@ -464,12 +474,12 @@ const PregameScreen = (props) => {
 
       let jsontext = await FileSystem.readAsStringAsync(scheduleFileUri);
       let matchjson = await JSON.parse(jsontext);
-      if (!matchNum) return;
+      if (!matchNumToUse) return;
 
       let teams;
 
       try {
-        teams = await matchjson["Schedule"][matchNum - 1]["teams"];
+        teams = await matchjson["Schedule"][matchNumToUse - 1]["teams"];
       } catch (e) {
         setTeamNum(undefined);
         console.warn(e);
@@ -489,11 +499,11 @@ const PregameScreen = (props) => {
     let jsontext = await FileSystem.readAsStringAsync(scheduleCsvUri);
     let matchjson = await JSON.parse(jsontext);
 
-    if (!matchNum) return;
+    if (!matchNumToUse) return;
 
     let teams;
     try {
-      teams = await matchjson["Schedule"][matchNum - 1]["Teams"];
+      teams = await matchjson["Schedule"][matchNumToUse - 1]["Teams"];
     } catch (e) {
       setTeamNum(undefined);
       console.warn(e);
@@ -532,22 +542,41 @@ const PregameScreen = (props) => {
 
 // Pregame stylesheet
 const styles = StyleSheet.create({
+  statusBarBackground: {
+    flex: 1,
+    backgroundColor: colors.black,
+  },
+
+  safeArea: {
+    flex: 1,
+  },
+
   container: {
     flex: 1,
     backgroundColor: colors.background,
   },
 
   headerContainer: {
-    borderBottomWidth: 2,
-    borderBottomColor: colors.black,
-    height: Platform.OS === "android" ? StatusBar.currentHeight + 70 : 80,
+    backgroundColor: colors.black,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    height: Platform.OS === "android" ? StatusBar.currentHeight + 75 : 85,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 15,
+    zIndex: 10,
   },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
     position: "absolute",
-    bottom: 15,
+    bottom: 18,
     left: 0,
     right: 0,
     paddingHorizontal: 20,
@@ -576,25 +605,19 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 28,
     fontFamily: "Cooper-Black",
-    color: colors.black,
+    color: colors.primary,
     textAlign: "center",
   },
 
   backButton: {
-    backgroundColor: colors.black,
+    backgroundColor: colors.surface,
     width: 48,
     height: 48,
     borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: colors.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 2,
+    borderColor: colors.primary,
   },
 
   backButtonText: {
@@ -717,7 +740,7 @@ const styles = StyleSheet.create({
   },
 
   submitButtonDisabled: {
-    backgroundColor: colors.buttonDisabled,
+    opacity: 0.4,
   },
 
   scoutNameButton: {
@@ -852,12 +875,14 @@ const styles = StyleSheet.create({
   },
 
   commentButton: {
-    backgroundColor: colors.black,
+    backgroundColor: colors.surface,
     width: 48,
     height: 48,
     borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 2,
+    borderColor: colors.primary,
   },
 
   nameModalInput: {

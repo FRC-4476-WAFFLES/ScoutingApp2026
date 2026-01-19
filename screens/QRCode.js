@@ -18,7 +18,7 @@ import { captureRef } from 'react-native-view-shot';
 import { colors } from "../components/colors";
 import { parseCSV } from "../utils/csv";
 
-const CSV_HEADERS = "Team Number,Match Number,TMA Key,Driver Station,Alliance,Scout Name,Comments,Auto Fuel Scored,Auto Passes,TeleOp Fuel Scored,TeleOp Passes,Questions/Clarifications";
+const CSV_HEADERS = "Team Number,Match Number,TMA Key,Driver Station,Alliance,Scout Name,Comments,Auto Fuel Scored,Auto Passes,TeleOp Fuel Scored,TeleOp Passes,Questions/Clarifications,Compared Team,Previous Team,Comparison Result";
 
 export const getCSVHeaders = () => CSV_HEADERS;
 
@@ -70,7 +70,10 @@ const QRCodeScreen = props => {
       { header: 'Auto Passes', index: 8 },
       { header: 'TeleOp Fuel Scored', index: 9 },
       { header: 'TeleOp Passes', index: 10 },
-      { header: 'Questions/Clarifications', index: 11 }
+      { header: 'Questions/Clarifications', index: 11 },
+      { header: 'Compared Team', index: 12 },
+      { header: 'Previous Team', index: 13 },
+      { header: 'Comparison Result', index: 14 }
     ];
 
     return (
@@ -102,9 +105,12 @@ const QRCodeScreen = props => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.headerContainer}>
+    <View style={styles.statusBarBackground}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.black} />
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.container}>
+          {/* Header */}
+          <View style={styles.headerContainer}>
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
@@ -113,7 +119,7 @@ const QRCodeScreen = props => {
             <Text style={styles.backButtonText}>←</Text>
           </TouchableOpacity>
           <Text style={styles.title}>QR Code</Text>
-          <View style={{width: 32}} />
+          <View style={{width: 48}} />
         </View>
       </View>
 
@@ -175,7 +181,9 @@ const QRCodeScreen = props => {
           <Text style={styles.buttonText}>Next Match</Text>
         </TouchableOpacity>
       </ScrollView>
-    </SafeAreaView>
+        </View>
+      </SafeAreaView>
+    </View>
   );
 
   async function captureQR() {
@@ -210,25 +218,43 @@ const QRCodeScreen = props => {
 }
 
 const styles = StyleSheet.create({
+  statusBarBackground: {
+    flex: 1,
+    backgroundColor: colors.black,
+  },
+
+  safeArea: {
+    flex: 1,
+  },
+
   container: {
     flex: 1,
     backgroundColor: colors.background,
   },
 
   headerContainer: {
-    backgroundColor: colors.background,
-    borderBottomWidth: 2,
-    borderBottomColor: colors.black,
+    backgroundColor: colors.black,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
     height: Platform.OS === "android" ?
-      StatusBar.currentHeight + 70 :
-      80,
+      StatusBar.currentHeight + 75 :
+      85,
+    shadowColor: '#000000',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 15,
+    zIndex: 10,
   },
 
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     position: 'absolute',
-    bottom: 15,
+    bottom: 18,
     left: 0,
     right: 0,
     paddingHorizontal: 20,
@@ -236,11 +262,13 @@ const styles = StyleSheet.create({
   },
 
   backButton: {
-    backgroundColor: colors.black,
+    backgroundColor: colors.surface,
     width: 48,
     height: 48,
     borderRadius: 24,
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.primary,
     justifyContent: 'center',
     shadowColor: colors.black,
     shadowOffset: {
@@ -266,7 +294,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 28,
     fontFamily: 'Cooper-Black',
-    color: colors.black,
+    color: colors.primary,
     textAlign: "center",
   },
 
